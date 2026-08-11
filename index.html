@@ -1,0 +1,1431 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Monte Carlo simulation of landfill slope stability under a rising leachate head.">
+<title>Landfill Slope Reliability — Monte Carlo</title>
+<style>
+  :root {
+    color-scheme: light;
+    --paper:      #EBF0F0;
+    --panel:      #FAFCFC;
+    --panel-2:    #F1F5F5;
+    --ink:        #0F1618;
+    --ink-2:      #48585C;
+    --ink-3:      #718386;
+    --line:       #D6DFDF;
+    --line-2:     #C0CBCB;
+    --accent:     #9A6A16;
+    --accent-ink: #7C5511;
+    --accent-soft:rgba(154,106,22,.13);
+    --s1:         #2a78d6;
+    --s2:         #eb6834;
+    --s3:         #1baf7a;
+    --s1-fill:    rgba(42,120,214,.15);
+    --s2-fill:    rgba(235,104,52,.15);
+    --s3-fill:    rgba(27,175,122,.15);
+    --crit:       #B3261E;
+    --good:       #1F7A4D;
+    --shadow:     0 1px 2px rgba(15,22,24,.05), 0 8px 24px -18px rgba(15,22,24,.35);
+
+    --display: "Futura", "Avenir Next", "Century Gothic", "Trebuchet MS", system-ui, sans-serif;
+    --body: "Charter", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --paper:      #0C1113;
+      --panel:      #141A1D;
+      --panel-2:    #101618;
+      --ink:        #E7EEEE;
+      --ink-2:      #9FB0B3;
+      --ink-3:      #7B8C8F;
+      --line:       #232D30;
+      --line-2:     #334145;
+      --accent:     #D9A644;
+      --accent-ink: #E6B95F;
+      --accent-soft:rgba(217,166,68,.15);
+      --s1:         #3987e5;
+      --s2:         #d95926;
+      --s3:         #199e70;
+      --s1-fill:    rgba(57,135,229,.24);
+      --s2-fill:    rgba(217,89,38,.24);
+      --s3-fill:    rgba(25,158,112,.26);
+      --crit:       #E8695C;
+      --good:       #4FBE8B;
+      --shadow:     0 1px 2px rgba(0,0,0,.4), 0 10px 28px -20px rgba(0,0,0,.9);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper:      #0C1113;
+    --panel:      #141A1D;
+    --panel-2:    #101618;
+    --ink:        #E7EEEE;
+    --ink-2:      #9FB0B3;
+    --ink-3:      #7B8C8F;
+    --line:       #232D30;
+    --line-2:     #334145;
+    --accent:     #D9A644;
+    --accent-ink: #E6B95F;
+    --accent-soft:rgba(217,166,68,.15);
+    --s1:         #3987e5;
+    --s2:         #d95926;
+    --s3:         #199e70;
+    --s1-fill:    rgba(57,135,229,.24);
+    --s2-fill:    rgba(217,89,38,.24);
+    --s3-fill:    rgba(25,158,112,.26);
+    --crit:       #E8695C;
+    --good:       #4FBE8B;
+    --shadow:     0 1px 2px rgba(0,0,0,.4), 0 10px 28px -20px rgba(0,0,0,.9);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  .shell { max-width: 1280px; margin: 0 auto; padding: 0 22px 72px; }
+
+  /* ---------- masthead ---------- */
+  .masthead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 40px 0 20px;
+    border-bottom: 1px solid var(--line-2);
+  }
+  .eyebrow {
+    font-family: var(--display);
+    font-size: 11px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--accent-ink);
+    margin: 0 0 8px;
+  }
+  h1 {
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: clamp(28px, 4.2vw, 44px);
+    line-height: 1.04;
+    letter-spacing: -.012em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  .standfirst {
+    max-width: 60ch;
+    margin: 12px 0 0;
+    color: var(--ink-2);
+    font-size: 16.5px;
+  }
+  .runstate {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-3);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.9;
+  }
+  .runstate b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- layout ---------- */
+  .layout {
+    display: grid;
+    grid-template-columns: 306px minmax(0, 1fr);
+    gap: 26px;
+    align-items: start;
+    padding-top: 26px;
+  }
+  @media (max-width: 940px) { .layout { grid-template-columns: minmax(0,1fr); } }
+
+  /* ---------- control rail ---------- */
+  .rail {
+    position: sticky;
+    top: 16px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    box-shadow: var(--shadow);
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+  }
+  @media (max-width: 940px) { .rail { position: static; max-height: none; } }
+  .rail-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel-2);
+    position: sticky;
+    top: 0;
+    z-index: 3;
+  }
+  .rail-head span {
+    font-family: var(--display);
+    font-size: 11px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+  }
+  .reset {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-2);
+    background: transparent;
+    border: 1px solid var(--line-2);
+    border-radius: 3px;
+    padding: 4px 9px;
+    cursor: pointer;
+  }
+  .reset:hover { color: var(--accent-ink); border-color: var(--accent); background: var(--accent-soft); }
+
+  .fieldset { border-top: 1px solid var(--line); padding: 14px 16px 16px; }
+  .fieldset:first-of-type { border-top: 0; }
+  .legend {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-family: var(--display);
+    font-size: 11px;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--ink);
+    margin-bottom: 3px;
+  }
+  .legend em {
+    font-family: var(--mono);
+    font-style: normal;
+    font-size: 10px;
+    letter-spacing: .02em;
+    text-transform: none;
+    color: var(--ink-3);
+  }
+  .hint {
+    font-size: 13px;
+    color: var(--ink-3);
+    margin: 0 0 12px;
+    line-height: 1.45;
+  }
+
+  .ctrl { margin-top: 13px; }
+  .ctrl-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 5px;
+  }
+  .ctrl label {
+    font-size: 13.5px;
+    color: var(--ink-2);
+    line-height: 1.3;
+  }
+  .num {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+    width: 66px;
+    flex: none;
+    text-align: right;
+    color: var(--ink);
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 3px 6px;
+  }
+  .num:hover { border-color: var(--line-2); }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 18px;
+    background: transparent;
+    margin: 0;
+    display: block;
+    cursor: ew-resize;
+  }
+  input[type=range]::-webkit-slider-runnable-track {
+    height: 3px;
+    background: var(--line-2);
+    border-radius: 2px;
+  }
+  input[type=range]::-moz-range-track {
+    height: 3px;
+    background: var(--line-2);
+    border-radius: 2px;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 13px; height: 13px;
+    margin-top: -5px;
+    border-radius: 50%;
+    background: var(--panel);
+    border: 2px solid var(--accent);
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 11px; height: 11px;
+    border-radius: 50%;
+    background: var(--panel);
+    border: 2px solid var(--accent);
+  }
+  input[type=range]:hover::-webkit-slider-thumb { background: var(--accent-soft); }
+
+  .scen-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--line);
+  }
+  .fieldset .scen-head:first-of-type { margin-top: 4px; padding-top: 0; border-top: 0; }
+  .swatch { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+  .scen-head strong {
+    font-family: var(--display);
+    font-size: 12.5px;
+    font-weight: 500;
+    letter-spacing: .04em;
+  }
+
+  .runrow { display: flex; gap: 10px; margin-top: 12px; }
+  .runrow > div { flex: 1; min-width: 0; }
+  .runrow label {
+    display: block;
+    font-size: 12.5px;
+    color: var(--ink-2);
+    margin-bottom: 4px;
+  }
+  .runrow select, .runrow input {
+    width: 100%;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 5px 6px;
+  }
+
+  /* ---------- result cards ---------- */
+  .stack { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    box-shadow: var(--shadow);
+    min-width: 0;
+  }
+  .card-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding: 14px 18px 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  .card-head h2 {
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: 14px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    margin: 0;
+  }
+  .card-head p {
+    margin: 0;
+    font-size: 13.5px;
+    color: var(--ink-3);
+    max-width: 62ch;
+  }
+  .card-body { padding: 16px 18px 18px; }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0,1fr));
+    gap: 20px;
+  }
+  @media (max-width: 760px) { .cards { grid-template-columns: minmax(0,1fr); } }
+
+  .scard { padding: 16px 18px 18px; border-top: 3px solid var(--sc); }
+  .scard .name {
+    font-family: var(--display);
+    font-size: 12px;
+    letter-spacing: .11em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .scard .pf {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 40px;
+    line-height: 1.15;
+    letter-spacing: -.03em;
+    margin-top: 10px;
+    color: var(--ink);
+  }
+  .scard .pf small { font-size: 17px; color: var(--ink-3); letter-spacing: 0; }
+  .scard .pf-label {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    padding: 2px 8px;
+    margin-top: 12px;
+  }
+  .chip::before {
+    content: "";
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  .chip.ok   { color: var(--good); }
+  .chip.warn { color: var(--accent-ink); }
+  .chip.bad  { color: var(--crit); }
+
+  .kv {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2px 10px;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+    font-size: 13px;
+  }
+  .kv dt { color: var(--ink-3); }
+  .kv dd {
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    color: var(--ink);
+  }
+
+  /* ---------- charts ---------- */
+  .plot { position: relative; }
+  .plot svg { display: block; width: 100%; height: auto; }
+  .tip {
+    position: absolute;
+    pointer-events: none;
+    opacity: 0;
+    transform: translate(-50%, -100%);
+    background: var(--panel);
+    border: 1px solid var(--line-2);
+    border-radius: 3px;
+    box-shadow: var(--shadow);
+    padding: 7px 9px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.55;
+    white-space: nowrap;
+    z-index: 5;
+    transition: opacity .12s ease;
+  }
+  .tip .th {
+    color: var(--ink-3);
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    font-size: 10px;
+    display: block;
+    margin-bottom: 3px;
+  }
+  .tip .row { display: flex; align-items: center; gap: 7px; color: var(--ink); }
+  .tip .row i { width: 7px; height: 7px; border-radius: 1px; flex: none; }
+  .tip .row u { text-decoration: none; margin-left: auto; padding-left: 12px; }
+
+  .keys {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    padding: 0 18px 14px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--ink-2);
+  }
+  .keys span { display: inline-flex; align-items: center; gap: 7px; }
+  .keys i { width: 11px; height: 3px; border-radius: 1px; }
+  .keys i.dash {
+    height: 0;
+    border-top: 2px dashed var(--ink-3);
+    width: 13px;
+  }
+
+  /* ---------- table ---------- */
+  .tablewrap { overflow-x: auto; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+  }
+  th, td {
+    text-align: right;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  thead th {
+    color: var(--ink-3);
+    font-weight: 400;
+    font-size: 10.5px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--line-2);
+  }
+  thead th .lc { text-transform: none; }
+  tbody th {
+    text-align: left;
+    font-weight: 500;
+    color: var(--ink);
+  }
+  tbody th span {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 2px;
+    margin-right: 8px;
+  }
+  tbody tr:last-child th, tbody tr:last-child td { border-bottom: 0; }
+
+  /* ---------- method note ---------- */
+  .method { font-size: 14.5px; color: var(--ink-2); }
+  .method p { margin: 0 0 12px; max-width: 68ch; }
+  .method p:last-child { margin-bottom: 0; }
+  .eq {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--ink);
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-left: 2px solid var(--accent);
+    border-radius: 3px;
+    padding: 10px 12px;
+    margin: 0 0 14px;
+    overflow-x: auto;
+    line-height: 1.9;
+    white-space: pre;
+  }
+  code {
+    font-family: var(--mono);
+    font-size: .92em;
+    color: var(--ink);
+  }
+
+  footer {
+    margin-top: 34px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--ink-3);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="masthead">
+    <div>
+      <p class="eyebrow">Infinite-slope reliability · Monte Carlo</p>
+      <h1>Landfill slope stability under a rising leachate head</h1>
+      <p class="standfirst">Ten thousand synthetic slopes per scenario. Cohesion, friction angle and unit weight are drawn once and shared across all three scenarios, so the only thing separating them is how much leachate sits above the liner.</p>
+    </div>
+    <div class="runstate" id="runstate"></div>
+  </header>
+
+  <div class="layout">
+    <form class="rail" id="rail" autocomplete="off">
+      <div class="rail-head">
+        <span>Inputs</span>
+        <button type="button" class="reset" id="reset">Reset</button>
+      </div>
+      <div id="railBody"></div>
+    </form>
+
+    <div class="stack">
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Cross-section</h2>
+          <p>The slab of waste above the liner, drawn to the current geometry. Each coloured line is one scenario's mean leachate head.</p>
+        </div>
+        <div class="card-body plot" id="sectionPlot"></div>
+      </section>
+
+      <div class="cards" id="cards"></div>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Factor of safety</h2>
+          <p>Distribution across all samples, 50 shared bins. Anything left of the dashed line has slid.</p>
+        </div>
+        <div class="card-body plot" id="histPlot">
+          <div class="tip" id="histTip"></div>
+        </div>
+        <div class="keys" id="histKeys"></div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Sensitivity to leachate head</h2>
+          <p>Failure probability as the mean head sweeps from a dry liner to a fully saturated slab, holding the baseline scenario's coefficient of variation. Markers sit at each scenario's own result, which uses its own spread — so they land near the curve, not exactly on it.</p>
+        </div>
+        <div class="card-body plot" id="sweepPlot">
+          <div class="tip" id="sweepTip"></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Summary</h2>
+          <p>Reliability index β is (mean FS − 1) ÷ std dev FS — how many standard deviations of margin sit between the slope and failure.</p>
+        </div>
+        <div class="card-body tablewrap">
+          <table id="summary">
+            <thead>
+              <tr>
+                <th scope="col" style="text-align:left">Scenario</th>
+                <th scope="col">Mean head</th>
+                <th scope="col">Mean FS</th>
+                <th scope="col">Median FS</th>
+                <th scope="col">Std dev FS</th>
+                <th scope="col">5th pct FS</th>
+                <th scope="col">Reliability <span class="lc">β</span></th>
+                <th scope="col">Failures</th>
+                <th scope="col">P(failure)</th>
+              </tr>
+            </thead>
+            <tbody id="summaryBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2>Method</h2></div>
+        <div class="card-body method">
+          <div class="eq">σ  = γ·z·cos²β                    total normal stress on the slip plane
+u  = γ_w·H·cos²β                  pore pressure from the leachate head
+σ′ = max(σ − u, 0)                effective normal stress
+τ_r = c′ + σ′·tan φ′               shear resistance
+τ_d = γ·z·sin β·cos β              driving shear stress
+FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
+          <p>Cohesion and leachate head are lognormal, so they stay positive and skew right. Friction angle and unit weight are normal, clipped to 1–50° and to a floor of 1 kN/m³ respectively. Head is capped at the slab depth — the leachate cannot rise above the waste.</p>
+          <p>The random number stream is seeded, so a given seed and sample count reproduce exactly. Material properties are drawn once and reused by all three scenarios, which is what makes the comparison a controlled one: the same ten thousand slopes, wetter or drier.</p>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <footer>Monte Carlo slope reliability · adjust anything on the left; every figure recomputes from the seeded stream.</footer>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  /* ============================ model ============================ */
+
+  const SCEN = [
+    { key: "baseline",   name: "Baseline",       tone: "--s1", fill: "--s1-fill", hMean: 3,   hSd: 1.5 },
+    { key: "heavy",      name: "Heavy rainfall", tone: "--s2", fill: "--s2-fill", hMean: 4.5, hSd: 2   },
+    { key: "mitigation", name: "Mitigation",     tone: "--s3", fill: "--s3-fill", hMean: 2.5, hSd: 1.2 }
+  ];
+
+  const GROUPS = [
+    {
+      title: "Slope & fill",
+      unit: "fixed",
+      hint: "Deterministic geometry — the same for every sample.",
+      items: [
+        { k: "beta",  label: "Slope angle β",            u: "°",      min: 5,   max: 45, step: 0.5,  def: 25   },
+        { k: "z",     label: "Depth to slip plane z",    u: "m",      min: 2,   max: 30, step: 0.5,  def: 10   },
+        { k: "gw",    label: "Leachate unit weight γ_w", u: "kN/m³",  min: 8,   max: 11, step: 0.01, def: 9.81 }
+      ]
+    },
+    {
+      title: "Material properties",
+      unit: "random",
+      hint: "Drawn once, shared by all three scenarios.",
+      items: [
+        { k: "cMean",   label: "Cohesion c′ — mean",       u: "kPa",    min: 0.5, max: 40, step: 0.1, def: 10   },
+        { k: "cSd",     label: "Cohesion c′ — std dev",    u: "kPa",    min: 0.1, max: 30, step: 0.1, def: 7.2  },
+        { k: "phiMean", label: "Friction φ′ — mean",       u: "°",      min: 5,   max: 50, step: 0.1, def: 32   },
+        { k: "phiSd",   label: "Friction φ′ — std dev",    u: "°",      min: 0,   max: 25, step: 0.1, def: 10.9 },
+        { k: "gMean",   label: "Unit weight γ — mean",     u: "kN/m³",  min: 5,   max: 25, step: 0.1, def: 10.5 },
+        { k: "gSd",     label: "Unit weight γ — std dev",  u: "kN/m³",  min: 0,   max: 8,  step: 0.1, def: 2.5  }
+      ]
+    }
+  ];
+
+  const HEAD_LIMITS = { min: 0.1, max: 30, step: 0.1, sdMin: 0.05, sdMax: 15 };
+
+  const S = { N: 10000, seed: 42 };
+  GROUPS.forEach(g => g.items.forEach(it => { S[it.k] = it.def; }));
+  SCEN.forEach(s => { S[s.key + "Mean"] = s.hMean; S[s.key + "Sd"] = s.hSd; });
+
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function normalStream(rand) {
+    let spare = null;
+    return function () {
+      if (spare !== null) { const v = spare; spare = null; return v; }
+      let u = 0, v = 0, s = 0;
+      do {
+        u = rand() * 2 - 1;
+        v = rand() * 2 - 1;
+        s = u * u + v * v;
+      } while (s === 0 || s >= 1);
+      const m = Math.sqrt(-2 * Math.log(s) / s);
+      spare = v * m;
+      return u * m;
+    };
+  }
+  function lognormalParams(mean, sd) {
+    const m = Math.max(mean, 1e-9);
+    const sigma = Math.sqrt(Math.log(1 + (sd / m) ** 2));
+    return [Math.log(m) - 0.5 * sigma * sigma, sigma];
+  }
+  function quantile(sorted, p) {
+    const n = sorted.length;
+    if (!n) return NaN;
+    const idx = (n - 1) * p;
+    const lo = Math.floor(idx), hi = Math.ceil(idx);
+    return lo === hi ? sorted[lo] : sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+  }
+
+  let R = null;
+
+  function simulate() {
+    const N = S.N;
+    const rand = mulberry32(S.seed >>> 0);
+    const gauss = normalStream(rand);
+    const beta = S.beta * Math.PI / 180;
+    const cosB = Math.cos(beta), sinB = Math.sin(beta), cos2 = cosB * cosB;
+
+    // --- material properties: drawn once, shared by every scenario ---
+    const [cMu, cSig] = lognormalParams(S.cMean, S.cSd);
+    const cohesion = new Float64Array(N);
+    for (let i = 0; i < N; i++) cohesion[i] = Math.exp(cMu + cSig * gauss());
+
+    const tanPhi = new Float64Array(N);
+    for (let i = 0; i < N; i++) {
+      const a = Math.min(50, Math.max(1, S.phiMean + S.phiSd * gauss()));
+      tanPhi[i] = Math.tan(a * Math.PI / 180);
+    }
+
+    const sigmaTot = new Float64Array(N);
+    const driving = new Float64Array(N);
+    for (let i = 0; i < N; i++) {
+      const g = Math.max(1, S.gMean + S.gSd * gauss());
+      sigmaTot[i] = g * S.z * cos2;
+      driving[i] = g * S.z * sinB * cosB;
+    }
+
+    const evaluate = (head) => {
+      const FS = new Float64Array(N);
+      for (let i = 0; i < N; i++) {
+        const eff = Math.max(sigmaTot[i] - S.gw * head[i] * cos2, 0);
+        FS[i] = (cohesion[i] + eff * tanPhi[i]) / driving[i];
+      }
+      return FS;
+    };
+
+    // --- one scenario at a time, in order, off the same stream ---
+    const runs = SCEN.map(sc => {
+      const hMean = S[sc.key + "Mean"], hSd = S[sc.key + "Sd"];
+      const [hMu, hSig] = lognormalParams(hMean, hSd);
+      const head = new Float64Array(N);
+      let headSum = 0;
+      for (let i = 0; i < N; i++) {
+        const h = Math.min(Math.exp(hMu + hSig * gauss()), S.z);
+        head[i] = h;
+        headSum += h;
+      }
+      const FS = evaluate(head);
+
+      let sum = 0, fails = 0;
+      for (let i = 0; i < N; i++) { sum += FS[i]; if (FS[i] <= 1) fails++; }
+      const mean = sum / N;
+      let ss = 0;
+      for (let i = 0; i < N; i++) { const d = FS[i] - mean; ss += d * d; }
+      const sd = Math.sqrt(ss / Math.max(N - 1, 1));
+      const sorted = FS.slice().sort();
+
+      return {
+        ...sc,
+        FS, sorted,
+        mean, sd,
+        median: quantile(sorted, 0.5),
+        p05: quantile(sorted, 0.05),
+        p995: quantile(sorted, 0.995),
+        fails,
+        pf: fails / N,
+        headMeanActual: headSum / N,
+        headMeanInput: hMean
+      };
+    });
+
+    // --- shared bins, x clipped to the 99.5th percentile of the widest run ---
+    const hiRaw = Math.max(...runs.map(r => r.p995));
+    const hi = Math.max(1.25, Math.ceil(hiRaw * 4) / 4);
+    const BINS = 50;
+    const width = hi / BINS;
+    runs.forEach(r => {
+      const counts = new Uint32Array(BINS);
+      let over = 0;
+      for (let i = 0; i < N; i++) {
+        const b = Math.floor(r.FS[i] / width);
+        if (b >= BINS) over++; else counts[b >= 0 ? b : 0]++;
+      }
+      r.counts = counts;
+      r.over = over;
+    });
+
+    // --- Pf vs mean head, common random numbers for a smooth curve ---
+    const M = Math.min(N, 8000);
+    const cov = S.baselineSd / Math.max(S.baselineMean, 1e-9);
+    const sweepRand = mulberry32((S.seed >>> 0) ^ 0x9E3779B9);
+    const sweepGauss = normalStream(sweepRand);
+    const zH = new Float64Array(M);
+    for (let i = 0; i < M; i++) zH[i] = sweepGauss();
+
+    const STEPS = 36;
+    const sweep = [];
+    for (let s = 0; s <= STEPS; s++) {
+      const hm = 0.05 + (S.z - 0.05) * (s / STEPS);
+      const [mu, sig] = lognormalParams(hm, hm * cov);
+      let fails = 0;
+      for (let i = 0; i < M; i++) {
+        const h = Math.min(Math.exp(mu + sig * zH[i]), S.z);
+        const eff = Math.max(sigmaTot[i] - S.gw * h * cos2, 0);
+        if ((cohesion[i] + eff * tanPhi[i]) / driving[i] <= 1) fails++;
+      }
+      sweep.push({ h: hm, pf: fails / M });
+    }
+
+    R = { runs, hi, width, BINS, sweep, sweepM: M, cov };
+  }
+
+  /* ============================ helpers ============================ */
+
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (tag, attrs, text) => {
+    const n = document.createElementNS(NS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    if (text != null) n.textContent = text;
+    return n;
+  };
+  const cssVar = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const fmt = (v, d = 2) => Number(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+  const pct = p => (p === 0 ? "0.00" : p < 0.0001 ? "<0.01" : fmt(p * 100, 2));
+  const int = v => Number(v).toLocaleString("en-US");
+  function band(pf) {
+    if (pf <= 0.01) return ["ok", "Acceptable"];
+    if (pf <= 0.05) return ["warn", "Marginal"];
+    if (pf <= 0.15) return ["bad", "High"];
+    return ["bad", "Critical"];
+  }
+  // place a tooltip above the pointer, flipping below and clamping at the card edges
+  function placeTip(tip, host, px, py) {
+    tip.style.opacity = 1;
+    const tw = tip.offsetWidth, th = tip.offsetHeight, hw = host.clientWidth;
+    tip.style.left = Math.min(Math.max(px, tw / 2 + 2), Math.max(tw / 2 + 2, hw - tw / 2 - 2)) + "px";
+    if (py - th - 14 < 0) {
+      tip.style.top = (py + 18) + "px";
+      tip.style.transform = "translate(-50%, 0)";
+    } else {
+      tip.style.top = (py - 14) + "px";
+      tip.style.transform = "translate(-50%, -100%)";
+    }
+  }
+  function niceTicks(lo, hi, want) {
+    const span = hi - lo;
+    if (!(span > 0)) return [lo];
+    const raw = span / want;
+    const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(v => v >= raw) || 10 * mag;
+    const out = [];
+    for (let v = Math.ceil(lo / step) * step; v <= hi + step * 1e-9; v += step) out.push(Math.round(v / step) * step);
+    return out;
+  }
+
+  /* ============================ control rail ============================ */
+
+  function slider(spec) {
+    const wrap = document.createElement("div");
+    wrap.className = "ctrl";
+    const id = "c-" + spec.k;
+    wrap.innerHTML =
+      '<div class="ctrl-top"><label for="' + id + '">' + spec.label + (spec.u ? " <span style=\"color:var(--ink-3)\">(" + spec.u + ")</span>" : "") + "</label>" +
+      '<input class="num" type="number" inputmode="decimal" aria-label="' + spec.label + ' value" ' +
+      'min="' + spec.min + '" max="' + spec.max + '" step="' + spec.step + '" value="' + S[spec.k] + '"></div>' +
+      '<input id="' + id + '" type="range" min="' + spec.min + '" max="' + spec.max + '" step="' + spec.step + '" value="' + S[spec.k] + '">';
+    const num = wrap.querySelector(".num");
+    const rng = wrap.querySelector('input[type=range]');
+    const push = (v, syncBoth) => {
+      let x = Number(v);
+      if (!isFinite(x)) return;
+      x = Math.min(spec.max, Math.max(spec.min, x));
+      S[spec.k] = x;
+      rng.value = String(x);
+      if (syncBoth) num.value = String(x);
+      schedule();
+    };
+    rng.addEventListener("input", () => { num.value = rng.value; push(rng.value, false); });
+    num.addEventListener("change", () => push(num.value, true));
+    wrap.reset = () => { num.value = String(S[spec.k]); rng.value = String(S[spec.k]); };
+    return wrap;
+  }
+
+  const resetters = [];
+
+  function buildRail() {
+    const body = document.getElementById("railBody");
+
+    GROUPS.forEach(g => {
+      const fs = document.createElement("div");
+      fs.className = "fieldset";
+      fs.innerHTML = '<div class="legend">' + g.title + " <em>" + g.unit + "</em></div>" +
+                     '<p class="hint">' + g.hint + "</p>";
+      g.items.forEach(it => { const s = slider(it); resetters.push(s.reset); fs.appendChild(s); });
+      body.appendChild(fs);
+    });
+
+    const fs = document.createElement("div");
+    fs.className = "fieldset";
+    fs.innerHTML = '<div class="legend">Leachate scenarios <em>lognormal</em></div>' +
+                   '<p class="hint">Mean head above the liner, and its spread. Capped at the slab depth.</p>';
+    SCEN.forEach(sc => {
+      const head = document.createElement("div");
+      head.className = "scen-head";
+      head.innerHTML = '<span class="swatch" style="background:var(' + sc.tone + ')"></span><strong>' + sc.name + "</strong>";
+      fs.appendChild(head);
+      [
+        { k: sc.key + "Mean", label: "Mean head", u: "m", min: HEAD_LIMITS.min, max: HEAD_LIMITS.max, step: HEAD_LIMITS.step },
+        { k: sc.key + "Sd",   label: "Std dev",   u: "m", min: HEAD_LIMITS.sdMin, max: HEAD_LIMITS.sdMax, step: HEAD_LIMITS.step }
+      ].forEach(it => { const s = slider(it); resetters.push(s.reset); fs.appendChild(s); });
+    });
+    body.appendChild(fs);
+
+    const run = document.createElement("div");
+    run.className = "fieldset";
+    run.innerHTML =
+      '<div class="legend">Run <em>seeded</em></div>' +
+      '<div class="runrow">' +
+        '<div><label for="nsel">Samples</label><select id="nsel">' +
+          [1000, 5000, 10000, 25000, 50000, 100000].map(n =>
+            '<option value="' + n + '"' + (n === S.N ? " selected" : "") + ">" + int(n) + "</option>").join("") +
+        "</select></div>" +
+        '<div><label for="seed">Seed</label><input id="seed" type="number" min="0" step="1" value="' + S.seed + '"></div>' +
+      "</div>";
+    body.appendChild(run);
+
+    run.querySelector("#nsel").addEventListener("change", e => { S.N = Number(e.target.value); schedule(); });
+    run.querySelector("#seed").addEventListener("change", e => {
+      const v = Math.max(0, Math.floor(Number(e.target.value) || 0));
+      S.seed = v; e.target.value = String(v); schedule();
+    });
+
+    document.getElementById("reset").addEventListener("click", () => {
+      GROUPS.forEach(g => g.items.forEach(it => { S[it.k] = it.def; }));
+      SCEN.forEach(sc => { S[sc.key + "Mean"] = sc.hMean; S[sc.key + "Sd"] = sc.hSd; });
+      S.N = 10000; S.seed = 42;
+      resetters.forEach(fn => fn());
+      run.querySelector("#nsel").value = "10000";
+      run.querySelector("#seed").value = "42";
+      schedule();
+    });
+
+    document.getElementById("rail").addEventListener("submit", e => e.preventDefault());
+  }
+
+  /* ============================ cross-section ============================ */
+
+  function drawSection() {
+    const host = document.getElementById("sectionPlot");
+    const W = Math.max(360, host.clientWidth || 640), H = 318;
+
+    const ink = cssVar("--ink"), ink2 = cssVar("--ink-2"), ink3 = cssVar("--ink-3");
+    const line2 = cssVar("--line-2"), panel = cssVar("--panel");
+
+    const svg = el("svg", { viewBox: "0 0 " + W + " " + H, role: "img",
+      "aria-label": "Cross-section of the waste slab above the liner, with each scenario's mean leachate head drawn as a line" });
+
+    const defs = el("defs");
+    const hatch = el("pattern", { id: "liner", width: 6, height: 6, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" });
+    hatch.appendChild(el("line", { x1: 0, y1: 0, x2: 0, y2: 6, stroke: ink3, "stroke-width": 1, opacity: .5 }));
+    defs.appendChild(hatch);
+    svg.appendChild(defs);
+
+    const beta = S.beta * Math.PI / 180, cosB = Math.cos(beta), sinB = Math.sin(beta);
+    const ux = cosB, uy = sinB;      // downslope, left to right
+    const nx = sinB, ny = -cosB;     // outward normal, up out of the slab
+
+    const scale = Math.min(26, 92 / Math.max(S.z * cosB, 0.7));
+    const tPerp = S.z * cosB * scale;                     // slab thickness, perpendicular
+    const zPix = S.z * scale;                             // slab thickness, vertical
+    const L = Math.min((W - 200) / cosB, 120 / Math.max(sinB, 1e-6));
+    const BAND = 15;                                      // liner + subgrade band
+
+    // local frame: liner starts at (0,0) and runs downslope
+    const P = (s, o) => [s * ux + nx * o, s * uy + ny * o];
+    const [ax, ay] = P(0, 0), [bx, by] = P(L, 0);
+    const [sax, say] = P(0, tPerp), [sbx, sby] = P(L, tPerp);
+    const [lax, lay] = P(0, -BAND), [lbx, lby] = P(L, -BAND);
+    const back = 30;                                      // uphill extension for the dimension
+
+    const xs = [ax, bx, sax, sbx, lax, lbx, ax - back - 12];
+    const ys = [ay, by, say, sby, lay, lby, ay - back * (sinB / cosB) - zPix];
+    const pad = { l: 96, r: 100, t: 22, b: 54 };
+    const minX = Math.min(...xs) - pad.l, maxX = Math.max(...xs) + pad.r;
+    const minY = Math.min(...ys) - pad.t, maxY = Math.max(...ys) + pad.b;
+    const g = el("g", { transform: "translate(" +
+      ((W - (maxX - minX)) / 2 - minX) + " " + ((H - (maxY - minY)) / 2 - minY) + ")" });
+    svg.appendChild(g);
+
+    const poly = (pts, attrs) => g.appendChild(el("path",
+      Object.assign({ d: "M " + pts.map(p => p[0] + " " + p[1]).join(" L ") + " Z" }, attrs)));
+
+    // subgrade beneath the liner
+    poly([[ax, ay], [bx, by], [lbx, lby], [lax, lay]], { fill: "url(#liner)" });
+    g.appendChild(el("line", { x1: lax, y1: lay, x2: lbx, y2: lby, stroke: line2, "stroke-width": 1 }));
+
+    const rot = "rotate(" + fmt(S.beta, 2) + " ";
+
+    // waste slab
+    poly([[ax, ay], [bx, by], [sbx, sby], [sax, say]],
+      { fill: ink, "fill-opacity": .05, stroke: line2, "stroke-width": 1.25, "stroke-linejoin": "round" });
+
+    // saturated zone up to the wettest scenario mean
+    const deepest = Math.min(Math.max(...SCEN.map(s => S[s.key + "Mean"])), S.z);
+    const [wax, way] = P(0, deepest * cosB * scale), [wbx, wby] = P(L, deepest * cosB * scale);
+    poly([[ax, ay], [bx, by], [wbx, wby], [wax, way]], { fill: ink, "fill-opacity": .13 });
+
+    // liner
+    g.appendChild(el("line", { x1: ax, y1: ay, x2: bx, y2: by, stroke: ink, "stroke-width": 2.5 }));
+
+    const slabMid = P(L * 0.5, tPerp * 0.8);
+    g.appendChild(el("text", {
+      x: slabMid[0], y: slabMid[1], fill: ink3, "text-anchor": "middle",
+      "font-family": "var(--display)", "font-size": 10.5, "letter-spacing": ".18em",
+      transform: rot + slabMid[0] + " " + slabMid[1] + ")"
+    }, "WASTE"));
+    const linerMid = P(L * 0.5, -BAND / 2);
+    g.appendChild(el("text", {
+      x: linerMid[0], y: linerMid[1] + 3.5, fill: ink3, "text-anchor": "middle",
+      "font-family": "var(--mono)", "font-size": 9.5, "letter-spacing": ".14em",
+      transform: rot + linerMid[0] + " " + linerMid[1] + ")",
+      "paint-order": "stroke", stroke: panel, "stroke-width": 3
+    }, "LINER"));
+
+    // vertical dimension for z, off the uphill end, drafting-style
+    const dimX = ax - back;
+    const tanB = sinB / cosB;
+    const linerY = ay - (ax - dimX) * tanB;                // liner height at dimX (uphill = higher)
+    const extX = dimX - 12;                                // both extension lines reach past the dimension
+    g.appendChild(el("line", { x1: ax, y1: ay, x2: extX, y2: ay - (ax - extX) * tanB,
+      stroke: line2, "stroke-width": 1, "stroke-dasharray": "3 3" }));
+    g.appendChild(el("line", { x1: sax, y1: say, x2: extX, y2: say - (sax - extX) * tanB,
+      stroke: line2, "stroke-width": 1, "stroke-dasharray": "3 3" }));
+    g.appendChild(el("line", { x1: dimX, y1: linerY, x2: dimX, y2: linerY - zPix, stroke: ink2, "stroke-width": 1 }));
+    [[linerY, 1], [linerY - zPix, -1]].forEach(([yy, dir]) => {
+      g.appendChild(el("path", {
+        d: "M " + (dimX - 3.5) + " " + (yy - dir * 5.5) + " L " + dimX + " " + yy + " L " + (dimX + 3.5) + " " + (yy - dir * 5.5),
+        fill: "none", stroke: ink2, "stroke-width": 1.2, "stroke-linejoin": "round"
+      }));
+    });
+    g.appendChild(el("text", { x: dimX - 8, y: linerY - zPix / 2 - 2, fill: ink, "text-anchor": "end",
+      "font-family": "var(--mono)", "font-size": 11 }, "z = " + fmt(S.z, 1) + " m"));
+    g.appendChild(el("text", { x: dimX - 8, y: linerY - zPix / 2 + 12, fill: ink3, "text-anchor": "end",
+      "font-family": "var(--mono)", "font-size": 9.5 }, "vertical depth"));
+
+    // slope angle at the toe: horizontal datum against the slope's own continuation
+    const arcR = 32, arm = 52;
+    g.appendChild(el("line", { x1: bx, y1: by, x2: bx + arm, y2: by,
+      stroke: line2, "stroke-width": 1, "stroke-dasharray": "3 3" }));
+    g.appendChild(el("line", { x1: bx, y1: by, x2: bx + arm * ux, y2: by + arm * uy,
+      stroke: line2, "stroke-width": 1, "stroke-dasharray": "3 3" }));
+    g.appendChild(el("path", {
+      d: "M " + (bx + arcR) + " " + by + " A " + arcR + " " + arcR + " 0 0 1 " +
+         (bx + arcR * ux) + " " + (by + arcR * uy),
+      fill: "none", stroke: cssVar("--accent"), "stroke-width": 1.5
+    }));
+    const labA = beta / 2, labR = arcR + 15;
+    g.appendChild(el("text", {
+      x: bx + labR * Math.cos(labA) + 2, y: by + labR * Math.sin(labA) + 4,
+      fill: cssVar("--accent-ink"), "font-family": "var(--mono)", "font-size": 11,
+      "paint-order": "stroke", stroke: panel, "stroke-width": 3
+    }, "β " + fmt(S.beta, 1) + "°"));
+
+    // one head line per scenario, labelled at the toe
+    const heads = SCEN.map(sc => {
+      const h = Math.min(S[sc.key + "Mean"], S.z);
+      const [px, py] = P(0, h * cosB * scale);
+      const [qx, qy] = P(L, h * cosB * scale);
+      return { sc, h, px, py, qx, qy };
+    }).sort((a, b) => a.qy - b.qy);
+
+    let lastY = -Infinity;
+    heads.forEach(o => {
+      const c = cssVar(o.sc.tone);
+      g.appendChild(el("line", { x1: o.px, y1: o.py, x2: o.qx, y2: o.qy,
+        stroke: c, "stroke-width": 2, "stroke-linecap": "round" }));
+      const [tx, ty] = P(30, o.h * cosB * scale);
+      g.appendChild(el("path", {
+        d: "M " + (tx - 4.5) + " " + (ty - 8) + " L " + (tx + 4.5) + " " + (ty - 8) + " L " + tx + " " + ty + " Z",
+        fill: c
+      }));
+      const ly = Math.max(o.qy + 3.5, lastY + 13);
+      lastY = ly;
+      g.appendChild(el("text", { x: o.qx + 9, y: ly, fill: c,
+        "font-family": "var(--mono)", "font-size": 10.5,
+        "paint-order": "stroke", stroke: panel, "stroke-width": 3 }, fmt(o.h, 1) + " m"));
+    });
+
+    svg.appendChild(el("text", { x: 10, y: H - 9, fill: ink3,
+      "font-family": "var(--mono)", "font-size": 10.5 },
+      "coloured lines: mean leachate head per scenario · shading: saturated waste"));
+
+    host.replaceChildren(svg);
+  }
+
+  /* ============================ histogram ============================ */
+
+  function drawHist() {
+    const host = document.getElementById("histPlot");
+    const tip = document.getElementById("histTip");
+    const W = Math.max(360, host.clientWidth || 640), H = 340;
+    const m = { t: 18, r: 16, b: 42, l: 58 };
+    const iw = W - m.l - m.r, ih = H - m.t - m.b;
+
+    const ink = cssVar("--ink"), ink2 = cssVar("--ink-2"), ink3 = cssVar("--ink-3");
+    const line = cssVar("--line"), line2 = cssVar("--line-2"), panel = cssVar("--panel"), crit = cssVar("--crit");
+
+    const maxCount = Math.max(1, ...R.runs.map(r => Math.max(...r.counts)));
+    const yMax = maxCount * 1.14;
+    const x = v => m.l + (v / R.hi) * iw;
+    const y = v => m.t + ih - (v / yMax) * ih;
+
+    const svg = el("svg", { viewBox: "0 0 " + W + " " + H, role: "img",
+      "aria-label": "Histogram of factor of safety for the three scenarios; full figures are in the summary table below" });
+
+    const defs = el("defs");
+    const fz = el("pattern", { id: "fzone", width: 6, height: 6, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" });
+    fz.appendChild(el("line", { x1: 0, y1: 0, x2: 0, y2: 6, stroke: crit, "stroke-width": 1, opacity: .22 }));
+    defs.appendChild(fz);
+    svg.appendChild(defs);
+
+    // failure zone
+    svg.appendChild(el("rect", { x: m.l, y: m.t, width: Math.max(0, x(1) - m.l), height: ih, fill: "url(#fzone)" }));
+
+    // grid + y axis
+    niceTicks(0, yMax, 4).forEach(t => {
+      if (t === 0) return;
+      svg.appendChild(el("line", { x1: m.l, y1: y(t), x2: m.l + iw, y2: y(t), stroke: line, "stroke-width": 1 }));
+      svg.appendChild(el("text", { x: m.l - 10, y: y(t) + 4, fill: ink3, "text-anchor": "end",
+        "font-family": "var(--mono)", "font-size": 10.5 }, int(Math.round(t))));
+    });
+    svg.appendChild(el("line", { x1: m.l, y1: m.t + ih, x2: m.l + iw, y2: m.t + ih, stroke: line2, "stroke-width": 1 }));
+
+    // x axis
+    niceTicks(0, R.hi, 7).forEach(t => {
+      if (t < 0 || t > R.hi) return;
+      svg.appendChild(el("text", { x: x(t), y: m.t + ih + 18, fill: ink3, "text-anchor": "middle",
+        "font-family": "var(--mono)", "font-size": 10.5 }, fmt(t, t % 1 === 0 ? 0 : 1)));
+    });
+    svg.appendChild(el("text", { x: m.l + iw / 2, y: H - 8, fill: ink2, "text-anchor": "middle",
+      "font-family": "var(--display)", "font-size": 11, "letter-spacing": ".12em" }, "FACTOR OF SAFETY"));
+    svg.appendChild(el("text", { x: 14, y: m.t + ih / 2, fill: ink2, "text-anchor": "middle",
+      "font-family": "var(--display)", "font-size": 11, "letter-spacing": ".12em",
+      transform: "rotate(-90 14 " + (m.t + ih / 2) + ")" }, "SAMPLES PER BIN"));
+
+    // step outlines with translucent fills
+    R.runs.forEach(r => {
+      let d = "M " + x(0) + " " + y(0);
+      for (let i = 0; i < R.BINS; i++) {
+        d += " L " + x(i * R.width) + " " + y(r.counts[i]) + " L " + x((i + 1) * R.width) + " " + y(r.counts[i]);
+      }
+      d += " L " + x(R.hi) + " " + y(0) + " Z";
+      svg.appendChild(el("path", { d: d, fill: cssVar(r.fill), stroke: "none" }));
+      svg.appendChild(el("path", { d: d, fill: "none", stroke: cssVar(r.tone), "stroke-width": 2, "stroke-linejoin": "round" }));
+    });
+
+    // failure threshold
+    svg.appendChild(el("line", { x1: x(1), y1: m.t, x2: x(1), y2: m.t + ih,
+      stroke: ink, "stroke-width": 1.5, "stroke-dasharray": "5 4" }));
+    svg.appendChild(el("text", { x: x(1) - 7, y: m.t + 12, fill: crit, "text-anchor": "end",
+      "font-family": "var(--mono)", "font-size": 10.5, "paint-order": "stroke", stroke: panel, "stroke-width": 3.5 }, "FS ≤ 1  failure"));
+
+    // direct labels: each series is named where it most separates from the others
+    const marks = R.runs.map((r, si) => {
+      let bestLead = -Infinity, leadBin = 0, peak = 0;
+      for (let i = 0; i < R.BINS; i++) {
+        if (r.counts[i] > r.counts[peak]) peak = i;
+        let other = 0;
+        R.runs.forEach((o, oi) => { if (oi !== si) other = Math.max(other, o.counts[i]); });
+        const lead = r.counts[i] - other;
+        if (lead > bestLead) { bestLead = lead; leadBin = i; }
+      }
+      const bi = bestLead > 0 ? leadBin : peak;
+      return { r, px: x((bi + 0.5) * R.width), py: y(r.counts[bi]) - 11 };
+    }).sort((a, b) => a.py - b.py);
+    let prev = -Infinity;
+    marks.forEach(mk => {
+      let py = Math.max(mk.py, m.t + 28);
+      if (py - prev < 15) py = prev + 15;
+      prev = py;
+      svg.appendChild(el("text", {
+        x: Math.min(Math.max(mk.px, m.l + 42), m.l + iw - 42), y: py,
+        fill: cssVar(mk.r.tone), "text-anchor": "middle",
+        "font-family": "var(--mono)", "font-size": 11,
+        "paint-order": "stroke", stroke: panel, "stroke-width": 4
+      }, mk.r.name));
+    });
+
+    const over = R.runs.reduce((a, r) => a + r.over, 0);
+    if (over > 0) {
+      svg.appendChild(el("text", { x: m.l + iw, y: m.t + 12, fill: ink3, "text-anchor": "end",
+        "font-family": "var(--mono)", "font-size": 10,
+        "paint-order": "stroke", stroke: panel, "stroke-width": 3.5 },
+        int(over) + " samples past the axis"));
+    }
+
+    // hover layer
+    const cursor = el("line", { x1: 0, y1: m.t, x2: 0, y2: m.t + ih, stroke: ink3, "stroke-width": 1, opacity: 0 });
+    svg.appendChild(cursor);
+    const hit = el("rect", { x: m.l, y: m.t, width: iw, height: ih, fill: "transparent", style: "cursor:crosshair" });
+    svg.appendChild(hit);
+
+    const move = ev => {
+      const box = svg.getBoundingClientRect();
+      const sx = (ev.clientX - box.left) * (W / box.width);
+      const v = ((sx - m.l) / iw) * R.hi;
+      let bi = Math.floor(v / R.width);
+      if (bi < 0 || bi >= R.BINS) { leave(); return; }
+      const cx = x((bi + 0.5) * R.width);
+      cursor.setAttribute("x1", cx); cursor.setAttribute("x2", cx);
+      cursor.setAttribute("opacity", .7);
+      tip.innerHTML =
+        '<span class="th">FS ' + fmt(bi * R.width, 2) + " – " + fmt((bi + 1) * R.width, 2) + "</span>" +
+        R.runs.map(r => '<div class="row"><i style="background:' + cssVar(r.tone) + '"></i>' + r.name +
+          "<u>" + int(r.counts[bi]) + "</u></div>").join("");
+      const hostBox = host.getBoundingClientRect();
+      placeTip(tip, host, box.left - hostBox.left + cx / W * box.width, ev.clientY - hostBox.top);
+    };
+    const leave = () => { tip.style.opacity = 0; cursor.setAttribute("opacity", 0); };
+    hit.addEventListener("pointermove", move);
+    hit.addEventListener("pointerleave", leave);
+
+    host.replaceChildren(tip, svg);
+
+    document.getElementById("histKeys").innerHTML =
+      R.runs.map(r => '<span><i style="background:' + cssVar(r.tone) + '"></i>' + r.name + "</span>").join("") +
+      '<span><i class="dash"></i>Failure threshold, FS = 1</span>';
+  }
+
+  /* ============================ sweep ============================ */
+
+  function drawSweep() {
+    const host = document.getElementById("sweepPlot");
+    const tip = document.getElementById("sweepTip");
+    const W = Math.max(360, host.clientWidth || 640), H = 260;
+    const m = { t: 16, r: 18, b: 42, l: 58 };
+    const iw = W - m.l - m.r, ih = H - m.t - m.b;
+
+    const ink2 = cssVar("--ink-2"), ink3 = cssVar("--ink-3");
+    const line = cssVar("--line"), line2 = cssVar("--line-2"), panel = cssVar("--panel"), accent = cssVar("--accent");
+
+    const yMaxRaw = Math.max(0.02, ...R.sweep.map(p => p.pf), ...R.runs.map(r => r.pf));
+    const yMax = Math.min(1, yMaxRaw * 1.15);
+    const x = v => m.l + (v / S.z) * iw;
+    const y = v => m.t + ih - (v / yMax) * ih;
+
+    const svg = el("svg", { viewBox: "0 0 " + W + " " + H, role: "img",
+      "aria-label": "Failure probability versus mean leachate head, with each scenario marked" });
+
+    niceTicks(0, yMax, 4).forEach(t => {
+      svg.appendChild(el("line", { x1: m.l, y1: y(t), x2: m.l + iw, y2: y(t),
+        stroke: t === 0 ? line2 : line, "stroke-width": 1 }));
+      svg.appendChild(el("text", { x: m.l - 10, y: y(t) + 4, fill: ink3, "text-anchor": "end",
+        "font-family": "var(--mono)", "font-size": 10.5 }, fmt(t * 100, t > 0 && t < 0.05 ? 1 : 0) + "%"));
+    });
+    niceTicks(0, S.z, 6).forEach(t => {
+      if (t > S.z) return;
+      svg.appendChild(el("text", { x: x(t), y: m.t + ih + 18, fill: ink3, "text-anchor": "middle",
+        "font-family": "var(--mono)", "font-size": 10.5 }, fmt(t, t % 1 === 0 ? 0 : 1)));
+    });
+    svg.appendChild(el("text", { x: m.l + iw / 2, y: H - 8, fill: ink2, "text-anchor": "middle",
+      "font-family": "var(--display)", "font-size": 11, "letter-spacing": ".12em" }, "MEAN LEACHATE HEAD (m)"));
+    svg.appendChild(el("text", { x: 14, y: m.t + ih / 2, fill: ink2, "text-anchor": "middle",
+      "font-family": "var(--display)", "font-size": 11, "letter-spacing": ".12em",
+      transform: "rotate(-90 14 " + (m.t + ih / 2) + ")" }, "P(FAILURE)"));
+
+    const dLine = R.sweep.map((p, i) => (i ? "L " : "M ") + x(p.h) + " " + y(p.pf)).join(" ");
+    svg.appendChild(el("path", { d: dLine + " L " + x(R.sweep[R.sweep.length - 1].h) + " " + y(0) + " L " + x(R.sweep[0].h) + " " + y(0) + " Z",
+      fill: accent, opacity: .07 }));
+    svg.appendChild(el("path", { d: dLine, fill: "none", stroke: accent, "stroke-width": 2,
+      "stroke-linejoin": "round", "stroke-linecap": "round" }));
+
+    R.runs.forEach(r => {
+      const hx = Math.min(r.headMeanInput, S.z);
+      svg.appendChild(el("circle", { cx: x(hx), cy: y(r.pf), r: 5.5, fill: cssVar(r.tone), stroke: panel, "stroke-width": 2 }));
+      svg.appendChild(el("text", {
+        x: x(hx), y: y(r.pf) - 12, fill: cssVar(r.tone), "text-anchor": "middle",
+        "font-family": "var(--mono)", "font-size": 10.5, "paint-order": "stroke", stroke: panel, "stroke-width": 4
+      }, pct(r.pf) + "%"));
+    });
+
+    const cursor = el("line", { x1: 0, y1: m.t, x2: 0, y2: m.t + ih, stroke: ink3, "stroke-width": 1, opacity: 0 });
+    const dot = el("circle", { r: 4, fill: accent, stroke: panel, "stroke-width": 2, opacity: 0 });
+    svg.appendChild(cursor); svg.appendChild(dot);
+    const hit = el("rect", { x: m.l, y: m.t, width: iw, height: ih, fill: "transparent", style: "cursor:crosshair" });
+    svg.appendChild(hit);
+
+    hit.addEventListener("pointermove", ev => {
+      const box = svg.getBoundingClientRect();
+      const sx = (ev.clientX - box.left) * (W / box.width);
+      const hv = ((sx - m.l) / iw) * S.z;
+      let best = R.sweep[0];
+      for (const p of R.sweep) if (Math.abs(p.h - hv) < Math.abs(best.h - hv)) best = p;
+      const cx = x(best.h), cy = y(best.pf);
+      cursor.setAttribute("x1", cx); cursor.setAttribute("x2", cx); cursor.setAttribute("opacity", .7);
+      dot.setAttribute("cx", cx); dot.setAttribute("cy", cy); dot.setAttribute("opacity", 1);
+      tip.innerHTML = '<span class="th">Mean head ' + fmt(best.h, 2) + " m</span>" +
+        '<div class="row">P(failure)<u>' + pct(best.pf) + "%</u></div>";
+      const hostBox = host.getBoundingClientRect();
+      placeTip(tip, host,
+        box.left - hostBox.left + cx / W * box.width,
+        box.top - hostBox.top + cy / H * box.height - 4);
+    });
+    hit.addEventListener("pointerleave", () => {
+      tip.style.opacity = 0; cursor.setAttribute("opacity", 0); dot.setAttribute("opacity", 0);
+    });
+
+    host.replaceChildren(tip, svg);
+  }
+
+  /* ============================ cards + table ============================ */
+
+  function drawCards() {
+    const host = document.getElementById("cards");
+    host.replaceChildren(...R.runs.map(r => {
+      const [cls, word] = band(r.pf);
+      const card = document.createElement("section");
+      card.className = "card scard";
+      card.style.setProperty("--sc", "var(" + r.tone + ")");
+      card.innerHTML =
+        '<div class="name"><span class="swatch" style="background:var(' + r.tone + ')"></span>' + r.name + "</div>" +
+        '<div class="pf">' + pct(r.pf) + "<small>%</small></div>" +
+        '<div class="pf-label">Probability of failure</div>' +
+        '<div class="chip ' + cls + '">' + word + "</div>" +
+        '<dl class="kv">' +
+          "<dt>Mean FS</dt><dd>" + fmt(r.mean, 3) + "</dd>" +
+          "<dt>Reliability β</dt><dd>" + fmt(r.sd > 0 ? (r.mean - 1) / r.sd : 0, 2) + "</dd>" +
+          "<dt>Failed samples</dt><dd>" + int(r.fails) + " / " + int(S.N) + "</dd>" +
+          "<dt>Mean head</dt><dd>" + fmt(r.headMeanActual, 2) + " m</dd>" +
+        "</dl>";
+      return card;
+    }));
+  }
+
+  function drawTable() {
+    document.getElementById("summaryBody").innerHTML = R.runs.map(r =>
+      "<tr>" +
+        '<th scope="row"><span style="background:var(' + r.tone + ')"></span>' + r.name + "</th>" +
+        "<td>" + fmt(r.headMeanActual, 2) + " m</td>" +
+        "<td>" + fmt(r.mean, 3) + "</td>" +
+        "<td>" + fmt(r.median, 3) + "</td>" +
+        "<td>" + fmt(r.sd, 3) + "</td>" +
+        "<td>" + fmt(r.p05, 3) + "</td>" +
+        "<td>" + fmt(r.sd > 0 ? (r.mean - 1) / r.sd : 0, 2) + "</td>" +
+        "<td>" + int(r.fails) + "</td>" +
+        "<td>" + pct(r.pf) + " %</td>" +
+      "</tr>").join("");
+  }
+
+  function drawRunstate() {
+    document.getElementById("runstate").innerHTML =
+      "<b>" + int(S.N) + "</b> samples × 3 scenarios<br>seed <b>" + S.seed + "</b> · β = <b>" + fmt(S.beta, 1) +
+      "°</b> · z = <b>" + fmt(S.z, 1) + " m</b>";
+  }
+
+  /* ============================ render loop ============================ */
+
+  let pending = false;
+  function schedule() {
+    if (pending) return;
+    pending = true;
+    requestAnimationFrame(() => { pending = false; render(); });
+  }
+  function render() {
+    simulate();
+    drawRunstate();
+    drawSection();
+    drawCards();
+    drawHist();
+    drawSweep();
+    drawTable();
+  }
+
+  buildRail();
+  render();
+
+  let rw = window.innerWidth;
+  window.addEventListener("resize", () => {
+    if (Math.abs(window.innerWidth - rw) < 2) return;
+    rw = window.innerWidth;
+    schedule();
+  });
+  const mq = window.matchMedia("(prefers-color-scheme: dark)");
+  mq.addEventListener("change", schedule);
+  new MutationObserver(schedule).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+})();
+</script>
+</body>
+</html>
