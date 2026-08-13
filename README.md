@@ -5,6 +5,10 @@ synthetic slopes, evaluates the infinite-slope factor of safety for each one, an
 reports how often the slope fails under three leachate scenarios — baseline, heavy
 rainfall, and a mitigation case.
 
+It also carries twelve real waste-slope failures with the rain that actually fell
+before each one, measured at the nearest NOAA gauge, so the model's leachate-head
+axis can be read against something that happened.
+
 ![The control rail, the slope cross-section, and probability of failure for each scenario](docs/overview.jpg)
 
 ## Running it
@@ -66,6 +70,54 @@ exactly.
 
 Every input on the left is adjustable, including sample count (1 000–100 000) and seed;
 everything recomputes as you drag.
+
+## The observed failures
+
+![Antecedent rainfall percentile at twelve documented waste-slope failures](docs/rainfall.jpg)
+
+Three further sections carry real data rather than simulated slopes:
+
+- **What the rain was doing** — twelve documented waste-slope failures, ranked by where
+  their antecedent rainfall sat in the nearest gauge's own record for that season.
+  Colour marks what the published account blamed, which was assigned before any gauge
+  was consulted.
+- **Rain before the slide** — the daily hyetograph for the six weeks up to whichever
+  failure is selected. Click a row in either section to change it.
+- **Observed rainfall through the model** — each event's measured rainfall converted to
+  a head rise and pushed through this slope's own failure curve.
+
+The conversion is deliberately crude and fully exposed on the control rail:
+
+```
+ΔH = infiltration ratio × rainfall ÷ drainable porosity
+```
+
+with the antecedent window adjustable from 3 to 45 days. Defaults are 0.30 and 0.10.
+The head is taken as rainfall alone on a dry liner, so the last column isolates what
+that rain contributes by itself. This is a water-balance sketch, not a measured leachate
+level — no gauge in the dataset measured the head inside the waste.
+
+Every failure whose published account blames rain sits at or above the 57th percentile
+for 7-day antecedent rainfall. All four whose accounts blame something else — liner
+interface shear at Kettleman Hills, a methane explosion at Ümraniye, leachate
+recirculation at Doña Juana, static liquefaction of construction spoil at Hongao — sit
+at the 40th or below, three of them at zero. Payatas, the deadliest, is also the
+wettest: 588 mm in the preceding week, above the 97th percentile for that gauge.
+
+With eleven gauged events and no control group of landfills that took the same rain and
+held, this corroborates the published attributions. It does not establish a threshold,
+and the page does not claim one.
+
+Rainfall comes from NOAA GHCN-Daily and Global Summary of the Day, pulled live and
+computed rather than transcribed. `data/` holds the case list, the generated rainfall
+table, the puller, and a full data dictionary with the caveats that matter — gauge
+distance, day-boundary offsets, missing days, and the one site (Koshe, Addis Ababa) with
+no usable gauge within 150 km.
+
+```
+python3 data/build_antecedent_rainfall.py    # NOAA -> data/antecedent-rainfall.csv
+python3 data/embed_cases.py                  # -> back into index.html
+```
 
 ## Notes
 

@@ -617,6 +617,53 @@
 
       <section class="card">
         <div class="card-head">
+          <h2>What the rain was doing</h2>
+          <p>Twelve documented waste-slope failures, each against the nearest NOAA rain gauge that was recording that week. The bar is where the antecedent rainfall sat in that gauge's own record for the same time of year — 97% means wetter than 97 of every 100 comparable weeks there. Colour is what the published account blamed, which is independent of the rainfall data.</p>
+        </div>
+        <div class="card-body plot" id="casePlot">
+          <div class="tip" id="caseTip"></div>
+        </div>
+        <div class="keys" id="caseKeys"></div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Rain before the slide</h2>
+          <p>Daily totals at that gauge for the six weeks up to the failure. Pick a case above or from the list.</p>
+        </div>
+        <div class="card-body plot" id="hyetoPlot">
+          <div class="tip" id="hyetoTip"></div>
+        </div>
+        <div class="keys" id="hyetoKeys"></div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Observed rainfall through the model</h2>
+          <p>The measured antecedent rainfall of each real failure, converted to a head rise by the two coefficients on the left, then run through this slope's failure curve. The head is taken as rainfall alone on a dry liner, so the last column is what that rain adds by itself. It answers a narrow question — given only how much rain fell, what would this model have said? — so a low number next to a real disaster is a statement about the model, not about the site.</p>
+        </div>
+        <div class="card-body tablewrap">
+          <table id="caseTable">
+            <thead>
+              <tr>
+                <th scope="col" style="text-align:left">Failure</th>
+                <th scope="col">Date</th>
+                <th scope="col">Rain</th>
+                <th scope="col">Pctl</th>
+                <th scope="col">Implied <span class="lc">Δ</span>H</th>
+                <th scope="col">Modelled P(f)</th>
+                <th scope="col">Lift vs dry</th>
+                <th scope="col">Rain blamed</th>
+              </tr>
+            </thead>
+            <tbody id="caseBody"></tbody>
+          </table>
+        </div>
+        <div class="keys" id="caseNote"></div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
           <h2>Summary</h2>
           <p>Reliability index β is (mean FS − 1) ÷ std dev FS — how many standard deviations of margin sit between the slope and failure.</p>
         </div>
@@ -663,6 +710,34 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
 (() => {
   "use strict";
 
+  /* ============================ observed failures ============================
+
+     Twelve documented waste-slope failures, each paired with the rain that fell
+     before it. Rainfall is read straight off the nearest NOAA gauge that was
+     recording that week — see data/ for the puller and the full data dictionary.
+     Percentiles rank the event against the same gauge's own record at the same
+     time of year, so 97 means wetter than 97% of comparable weeks there.
+
+     Regenerate with:  python3 data/build_antecedent_rainfall.py
+                       python3 data/embed_cases.py                            */
+
+  // CASES-BEGIN
+  const CASES = [
+    {"id":"kettleman1988","short":"Kettleman Hills","site":"Kettleman Hills unit B-19","place":"Kettleman City CA, United States","date":"1988-03-19","deaths":0,"volume":490000,"implicated":"no","trigger":"Shear failure along the geosynthetic liner interfaces during filling; arid site with no leachate head","source":"Mitchell, Seed & Seed (1990), J. Geotech. Engrg. 116(4)","gauge":"Kettleman Stn","network":"GHCN-D","km":14.5,"p1":0,"p3":0,"p7":0,"p15":0,"p30":45.5,"p60":45.5,"p7obs":7,"p30obs":30,"p7shift":0,"p7pct":0,"p30pct":75.3,"p7ret":0.2,"p30ret":3,"daily":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.5,6.6,37.6,0.8,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]},
+    {"id":"umraniye1993","short":"Ümraniye","site":"Ümraniye-Hekimbaşı open dump","place":"Istanbul, Turkey","date":"1993-04-28","deaths":39,"volume":null,"implicated":"partial","trigger":"Methane explosion in the waste mass followed by slide into adjacent settlement","source":"Kocasoy & Curi (1995), Waste Manage. Res. 13(4)","gauge":"Ataturk","network":"GSOD","km":24.2,"p1":0,"p3":0,"p7":0,"p15":1.3,"p30":20.1,"p60":48.5,"p7obs":7,"p30obs":30,"p7shift":0,"p7pct":0,"p30pct":19.1,"p7ret":0.2,"p30ret":0.9,"daily":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,2.0,0.0,2.0,0.3,0.0,0.0,0.0,0.0,7.9,4.1,1.0,0.0,0.0,0.5,0.0,0.0,0.0,0.5,0.5,0.0,0.0,0.3,0.0,0.0,0.0,0.0,0.0,0.0,0.0]},
+    {"id":"rumpke1996","short":"Rumpke","site":"Rumpke Sanitary Landfill","place":"Colerain Township OH, United States","date":"1996-03-09","deaths":0,"volume":1200000,"implicated":"yes","trigger":"Deep-seated translational slide attributed to elevated leachate levels and elevated waste temperatures","source":"Stark, Eid, Evans & Sherry (2000), J. Geotech. Geoenviron. Eng. 126(5)","gauge":"Fairfield","network":"GHCN-D","km":7.6,"p1":0,"p3":0,"p7":19.1,"p15":39.9,"p30":56.2,"p60":102.2,"p7obs":7,"p30obs":30,"p7shift":19.1,"p7pct":57.9,"p30pct":24.9,"p7ret":0.4,"p30ret":1,"daily":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,5.8,5.6,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,10.7,0.0,0.0,0.0,0.0,0.0,0.0,8.4,12.4,0.0,0.0,0.0,0.0,0.0,0.0,19.1,0.0,0.0,0.0]},
+    {"id":"donajuana1997","short":"Doña Juana","site":"Doña Juana sanitary landfill zone II","place":"Bogotá, Colombia","date":"1997-09-27","deaths":0,"volume":1200000,"implicated":"partial","trigger":"High pore pressures from leachate recirculation and rapid filling; leachate collection capacity exceeded","source":"Hendron, Fernandez, Prommer, Giroud & Orozco (1999), Sardinia '99","gauge":"Bogota/Eldorado","network":"GHCN-D","km":22.1,"p1":0,"p3":0,"p7":10,"p15":22,"p30":25,"p60":40,"p7obs":7,"p30obs":30,"p7shift":9,"p7pct":40,"p30pct":13.7,"p7ret":0.3,"p30ret":0.8,"daily":[1.0,0.0,1.0,0.0,4.0,0.0,0.0,2.0,0.0,0.0,0.0,0.0,1.0,2.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,3.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,3.0,8.0,1.0,9.0,0.0,0.0,0.0,0.0,0.0]},
+    {"id":"payatas2000","short":"Payatas","site":"Payatas open dumpsite","place":"Quezon City, Philippines","date":"2000-07-10","deaths":278,"volume":null,"implicated":"yes","trigger":"Saturation of loosely placed waste after ~2 weeks of monsoon rain enhanced by two typhoons","source":"Merry, Kavazanjian & Fritz (2005), J. Perform. Constr. Facil. 19(2)","gauge":"Science Garden","network":"GHCN-D","km":12.8,"p1":10,"p3":95,"p7":588,"p15":757,"p30":905,"p60":1411,"p7obs":7,"p30obs":30,"p7shift":501,"p7pct":99.4,"p30pct":97.7,"p7ret":29.6,"p30ret":31.6,"daily":[78.0,0.0,2.0,0.0,0.0,0.0,7.0,0.0,9.0,0.0,0.0,1.0,0.0,0.0,2.0,23.0,0.0,14.0,0.0,4.0,35.0,0.0,0.0,9.0,3.0,25.0,15.0,18.0,2.0,0.0,5.0,0.0,0.0,3.0,3.0,27.0,28.0,103.0,88.0,137.0,93.0,175.0,68.0,17.0,10.0]},
+    {"id":"leuwigajah2005","short":"Leuwigajah","site":"Leuwigajah dumpsite","place":"Cimahi (Bandung), Indonesia","date":"2005-02-21","deaths":143,"volume":2700000,"implicated":"yes","trigger":"Heavy rainfall over several days plus an internal fire/gas pressure in a near-vertical waste face","source":"Lavigne et al. (2014), Geoenvironmental Disasters 1:10","gauge":"Bandung","network":"GSOD","km":9.7,"p1":null,"p3":null,"p7":66.8,"p15":73.2,"p30":242.1,"p60":null,"p7obs":4,"p30obs":24,"p7shift":null,"p7pct":90.8,"p30pct":null,"p7ret":1.8,"p30ret":null,"daily":[null,null,null,null,null,0.0,null,null,null,null,null,0.0,null,null,null,null,0.0,null,0.0,0.8,0.0,83.1,null,7.1,40.9,0.0,0.0,37.1,0.0,0.0,0.0,0.0,0.5,0.0,1.0,0.0,1.0,3.8,0.0,36.8,19.0,10.9,null,null,null]},
+    {"id":"xiaping2008","short":"Xiaping","site":"Xiaping landfill","place":"Shenzhen, China","date":"2008-06-07","deaths":0,"volume":null,"implicated":"yes","trigger":"Leachate level rose to ~2 m below the waste surface after heavy rain; waste body slipped 1–4 m","source":"Zhan, Zhang, Chen, Zhang & Chen (2016), PMC4730517","gauge":"Ta Kwu Ling","network":"GSOD","km":18.8,"p1":null,"p3":3.6,"p7":71.1,"p15":155.7,"p30":211.1,"p60":407.2,"p7obs":6,"p30obs":29,"p7shift":200.2,"p7pct":61.2,"p30pct":40.1,"p7ret":0.4,"p30ret":1.2,"daily":[0.0,0.0,4.1,0.0,3.0,0.0,0.0,0.0,2.0,13.0,0.0,0.0,4.1,0.0,0.0,0.0,3.6,5.6,0.5,0.0,0.0,0.0,0.0,0.0,0.0,5.6,16.5,22.6,0.5,0.5,11.9,8.9,21.1,5.6,1.0,6.1,12.4,17.5,1.5,15.5,0.5,50.0,0.5,3.0,null]},
+    {"id":"hongao2015","short":"Hongao","site":"Hongao construction-spoil dump","place":"Shenzhen, China","date":"2015-12-20","deaths":77,"volume":2730000,"implicated":"partial","trigger":"Saturated fine construction spoil dumped over a drained base; static liquefaction of the fill","source":"Yin, Li, Xu & Wang (2016), Engineering 2(2)","gauge":"Lau Fau Shan","network":"GSOD","km":27,"p1":0,"p3":0,"p7":0,"p15":63.8,"p30":64.3,"p60":77.7,"p7obs":7,"p30obs":30,"p7shift":3.6,"p7pct":0,"p30pct":85.4,"p7ret":0.2,"p30ret":5,"daily":[0.0,0.0,0.0,0.0,0.5,0.0,0.0,0.0,0.5,0.0,1.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.5,0.0,7.1,0.0,0.0,5.6,51.1,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]},
+    {"id":"koshe2017","short":"Koshe","site":"Koshe (Repi) dumpsite","place":"Addis Ababa, Ethiopia","date":"2017-03-11","deaths":115,"volume":null,"implicated":"unclear","trigger":"Disputed: residents attributed it to regrading/compaction for an adjacent waste-to-energy plant","source":"AGU Landslide Blog / UN-Habitat"},
+    {"id":"meethotamulla2017","short":"Meethotamulla","site":"Meethotamulla dumpsite","place":"Colombo, Sri Lanka","date":"2017-04-14","deaths":32,"volume":null,"implicated":"yes","trigger":"Collapse of an oversteepened face during the first inter-monsoon rains; an internal fire was burning","source":"Jayakody et al. / national reporting","gauge":"Colombo","network":"GHCN-D","km":5,"p1":0,"p3":75.7,"p7":78.3,"p15":80.6,"p30":132.4,"p60":306.2,"p7obs":7,"p30obs":30,"p7shift":78.3,"p7pct":73,"p30pct":36.5,"p7ret":0.6,"p30ret":1.2,"daily":[0.0,0.0,0.0,14.5,0.0,0.0,0.0,0.0,3.3,0.0,0.8,2.8,0.0,0.3,59.9,42.4,0.5,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.5,8.4,0.0,0.5,1.0,0.0,0.8,0.0,0.0,0.0,0.0,0.0,1.8,0.8,17.5,58.2,0.0]},
+    {"id":"ghazipur2017","short":"Ghazipur","site":"Ghazipur landfill","place":"Delhi, India","date":"2017-09-01","deaths":2,"volume":null,"implicated":"yes","trigger":"Flank collapse into a canal after heavy monsoon rain","source":"Contemporary reporting; NGT proceedings","gauge":"Safdarjung","network":"GSOD","km":12.3,"p1":68.1,"p3":72.1,"p7":89.2,"p15":157,"p30":221.7,"p60":358.4,"p7obs":6,"p30obs":17,"p7shift":79.2,"p7pct":77.4,"p30pct":55.8,"p7ret":0.8,"p30ret":1.7,"daily":[0.0,25.9,3.0,0.0,8.9,15.0,3.0,3.0,0.0,5.1,null,0.0,1.0,0.0,0.3,0.0,null,null,0.8,30.0,6.1,27.9,null,null,null,null,null,null,null,null,null,23.1,3.0,0.0,0.5,38.1,null,3.0,15.0,1.0,0.5,0.5,null,4.1,68.1]},
+    {"id":"hulene2018","short":"Hulene","site":"Hulene dumpsite","place":"Maputo, Mozambique","date":"2018-02-19","deaths":17,"volume":null,"implicated":"yes","trigger":"Collapse of the waste face onto adjacent housing after prolonged heavy rain","source":"Contemporary reporting (AFP/Reuters)","gauge":"Maputo","network":"GSOD","km":2.6,"p1":88.9,"p3":96.8,"p7":99.8,"p15":164.8,"p30":312.2,"p60":null,"p7obs":5,"p30obs":21,"p7shift":118.9,"p7pct":95.9,"p30pct":95.9,"p7ret":4.2,"p30ret":17.9,"daily":[null,null,null,71.9,0.0,null,null,null,null,null,null,0.8,0.0,null,null,null,null,null,0.0,119.1,0.0,5.1,2.0,10.9,0.0,null,6.1,0.0,4.1,0.0,null,null,null,22.1,8.9,3.0,30.0,1.0,0.0,null,null,3.0,0.0,7.9,88.9]}
+  ];
+  // CASES-END
+
   /* ============================ model ============================ */
 
   const SCEN = [
@@ -693,6 +768,16 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
         { k: "phiSd",   label: "Friction φ′ — std dev",    u: "°",      min: 0,   max: 25, step: 0.1, def: 10.9 },
         { k: "gMean",   label: "Unit weight γ — mean",     u: "kN/m³",  min: 5,   max: 25, step: 0.1, def: 10.5 },
         { k: "gSd",     label: "Unit weight γ — std dev",  u: "kN/m³",  min: 0,   max: 8,  step: 0.1, def: 2.5  }
+      ]
+    },
+    {
+      title: "Rainfall response",
+      unit: "observed → head",
+      hint: "Turns the measured rain at each real failure into a head rise. Crude on purpose — two numbers you can argue with.",
+      items: [
+        { k: "infil",  label: "Infiltration ratio",   u: "of rainfall", min: 0.02, max: 1,    step: 0.01, def: 0.3  },
+        { k: "nDrain", label: "Drainable porosity",   u: "of volume",   min: 0.02, max: 0.4,  step: 0.01, def: 0.1  },
+        { k: "winDays", label: "Antecedent window",  u: "days",        min: 3,    max: 45,   step: 1,    def: 30   }
       ]
     }
   ];
@@ -1350,6 +1435,269 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
     host.replaceChildren(tip, svg);
   }
 
+  /* ============================ observed failures ============================ */
+
+  // colour says what the published account blamed, never what the rain gauge read
+  const BLAME = {
+    yes:     { tone: "--s2",     word: "rain blamed",               tag: "yes" },
+    partial: { tone: "--accent", word: "rain a contributing factor", tag: "partly" },
+    no:      { tone: "--s1",     word: "rain not implicated",        tag: "no" },
+    unclear: { tone: "--ink-3",  word: "cause disputed",             tag: "disputed" }
+  };
+  const gauged = () => CASES.filter(c => c.daily && c.daily.length);
+  let picked = "payatas2000";
+
+  const ord = n => {
+    const v = Math.round(n), a = v % 10, b = v % 100;
+    return v + (a === 1 && b !== 11 ? "st" : a === 2 && b !== 12 ? "nd"
+             : a === 3 && b !== 13 ? "rd" : "th");
+  };
+
+  // rain over the `days` ending at the failure, summed from the daily series
+  function caseRain(c, days) {
+    if (!c.daily || !c.daily.length) return { mm: null, seen: 0, want: days };
+    const n = Math.min(days, c.daily.length);
+    let mm = 0, seen = 0;
+    for (let i = 0; i < n; i++) {
+      const v = c.daily[c.daily.length - 1 - i];
+      if (v != null) { mm += v; seen++; }
+    }
+    return { mm: seen >= n * 0.5 ? mm : null, seen, want: n };
+  }
+
+  // depth of rain that infiltrates, spread through the drainable voids it fills
+  function impliedRise(c) {
+    const { mm } = caseRain(c, S.winDays);
+    return mm == null ? null : (S.infil * mm / 1000) / S.nDrain;
+  }
+
+  function pfAtHead(h) {
+    const sw = R.sweep;
+    if (h <= sw[0].h) return sw[0].pf;
+    for (let i = 1; i < sw.length; i++) {
+      if (sw[i].h >= h) {
+        const a = sw[i - 1], b = sw[i];
+        return a.pf + (b.pf - a.pf) * (h - a.h) / (b.h - a.h);
+      }
+    }
+    return sw[sw.length - 1].pf;
+  }
+
+  function drawCases() {
+    const host = document.getElementById("casePlot");
+    const tip = document.getElementById("caseTip");
+    const rows = CASES.slice().sort((a, b) => {
+      const av = a.p7pct == null ? -1 : a.p7pct, bv = b.p7pct == null ? -1 : b.p7pct;
+      return bv - av;
+    });
+
+    const W = Math.max(360, host.clientWidth || 640);
+    const m = { t: 14, r: 20, b: 40, l: 128 };
+    const rowH = 26, ih = rows.length * rowH, H = m.t + ih + m.b;
+    const iw = W - m.l - m.r;
+    const ink = cssVar("--ink"), ink2 = cssVar("--ink-2"), ink3 = cssVar("--ink-3");
+    const line = cssVar("--line"), line2 = cssVar("--line-2"), panel = cssVar("--panel");
+
+    const x = v => m.l + (v / 100) * iw;
+    const yc = i => m.t + i * rowH + rowH / 2;
+
+    const svg = el("svg", { viewBox: "0 0 " + W + " " + H, role: "img",
+      "aria-label": "Antecedent rainfall percentile at each documented waste-slope failure" });
+
+    [0, 25, 50, 75, 100].forEach(t => {
+      svg.appendChild(el("line", { x1: x(t), y1: m.t, x2: x(t), y2: m.t + ih,
+        stroke: t === 50 ? line2 : line, "stroke-width": 1,
+        "stroke-dasharray": t === 50 ? "3 3" : "" }));
+      svg.appendChild(el("text", { x: x(t), y: m.t + ih + 17, fill: ink3, "text-anchor": "middle",
+        "font-family": "var(--mono)", "font-size": 10.5 }, t + "%"));
+    });
+    svg.appendChild(el("text", { x: m.l + iw / 2, y: H - 8, fill: ink2, "text-anchor": "middle",
+      "font-family": "var(--display)", "font-size": 11, "letter-spacing": ".12em" },
+      "ANTECEDENT RAINFALL PERCENTILE FOR THAT GAUGE, THAT SEASON"));
+
+    rows.forEach((c, i) => {
+      const y = yc(i);
+      const tone = cssVar(BLAME[c.implicated].tone);
+      const on = c.id === picked;
+
+      if (on) svg.appendChild(el("rect", { x: 4, y: y - rowH / 2 + 1, width: W - 8,
+        height: rowH - 2, rx: 3, fill: tone, opacity: .08 }));
+
+      svg.appendChild(el("text", { x: m.l - 12, y: y + 4, fill: on ? ink : ink2,
+        "text-anchor": "end", "font-family": "var(--body)", "font-size": 12.5,
+        "font-weight": on ? 600 : 400 }, c.short));
+
+      if (c.p7pct == null && c.p30pct == null) {
+        svg.appendChild(el("text", { x: m.l + 6, y: y + 4, fill: ink3,
+          "font-family": "var(--mono)", "font-size": 10.5 },
+          c.daily && c.daily.length ? "record too short to rank" : "no gauge within 150 km"));
+      } else {
+        const a = c.p30pct, b = c.p7pct;
+        if (a != null && b != null) svg.appendChild(el("line", { x1: x(a), y1: y, x2: x(b), y2: y,
+          stroke: tone, "stroke-width": 1.5, opacity: .5 }));
+        if (a != null) svg.appendChild(el("circle", { cx: x(a), cy: y, r: 4.5, fill: panel,
+          stroke: tone, "stroke-width": 1.75 }));
+        if (b != null) svg.appendChild(el("circle", { cx: x(b), cy: y, r: 5, fill: tone,
+          stroke: panel, "stroke-width": 1.5 }));
+      }
+
+      const hit = el("rect", { x: 0, y: y - rowH / 2, width: W, height: rowH,
+        fill: "transparent", style: "cursor:pointer" });
+      hit.addEventListener("pointerenter", () => {
+        const r7 = c.p7 == null ? "—" : fmt(c.p7, 0) + " mm";
+        const r30 = c.p30 == null ? "—" : fmt(c.p30, 0) + " mm";
+        tip.innerHTML = '<span class="th">' + c.site + "</span>" +
+          '<div class="row">' + c.place + "<u>" + c.date + "</u></div>" +
+          '<div class="row">7-day rain<u>' + r7 + (c.p7pct != null ? " · " + ord(c.p7pct) : "") + "</u></div>" +
+          '<div class="row">30-day rain<u>' + r30 + (c.p30pct != null ? " · " + ord(c.p30pct) : "") + "</u></div>" +
+          (c.gauge ? '<div class="row">Gauge<u>' + c.gauge + ", " + fmt(c.km, 0) + " km</u></div>" : "") +
+          '<div class="row">Account<u>' + BLAME[c.implicated].word + "</u></div>";
+        placeTip(tip, host, Math.min(W - 40, m.l + iw / 2), y + 6);
+      });
+      hit.addEventListener("pointerleave", () => { tip.style.opacity = 0; });
+      hit.addEventListener("click", () => { picked = c.id; drawCases(); drawHyeto(); drawCaseTable(); });
+      svg.appendChild(hit);
+    });
+
+    host.replaceChildren(tip, svg);
+
+    document.getElementById("caseKeys").innerHTML =
+      Object.keys(BLAME).map(k =>
+        '<span><i style="background:var(' + BLAME[k].tone + ')"></i>' + BLAME[k].word + "</span>").join("") +
+      '<span><i style="background:var(--ink-3)"></i>filled = 7-day · hollow = 30-day</span>';
+  }
+
+  function drawHyeto() {
+    const host = document.getElementById("hyetoPlot");
+    const tip = document.getElementById("hyetoTip");
+    const c = CASES.find(v => v.id === picked) || gauged()[0];
+    const keys = document.getElementById("hyetoKeys");
+
+    if (!c || !c.daily || !c.daily.length) {
+      host.replaceChildren(tip, el("svg", { viewBox: "0 0 400 60" },
+        "no daily record available for this failure"));
+      keys.textContent = c ? c.site + " — no gauge within 150 km was recording that week." : "";
+      return;
+    }
+
+    const days = c.daily.length;
+    const W = Math.max(360, host.clientWidth || 640), H = 240;
+    const m = { t: 18, r: 18, b: 44, l: 52 };
+    const iw = W - m.l - m.r, ih = H - m.t - m.b;
+    const ink2 = cssVar("--ink-2"), ink3 = cssVar("--ink-3");
+    const line = cssVar("--line"), line2 = cssVar("--line-2"), panel = cssVar("--panel");
+    const tone = cssVar(BLAME[c.implicated].tone);
+
+    const peak = Math.max(10, ...c.daily.filter(v => v != null));
+    const yMax = peak * 1.12;
+    const bw = iw / days;
+    const x = i => m.l + i * bw;
+    const y = v => m.t + ih - (v / yMax) * ih;
+
+    const svg = el("svg", { viewBox: "0 0 " + W + " " + H, role: "img",
+      "aria-label": "Daily rainfall for the six weeks before the " + c.short + " failure" });
+
+    niceTicks(0, yMax, 4).forEach(t => {
+      svg.appendChild(el("line", { x1: m.l, y1: y(t), x2: m.l + iw, y2: y(t),
+        stroke: t === 0 ? line2 : line, "stroke-width": 1 }));
+      svg.appendChild(el("text", { x: m.l - 9, y: y(t) + 4, fill: ink3, "text-anchor": "end",
+        "font-family": "var(--mono)", "font-size": 10.5 }, fmt(t, 0)));
+    });
+    svg.appendChild(el("text", { x: 13, y: m.t + ih / 2, fill: ink2, "text-anchor": "middle",
+      "font-family": "var(--display)", "font-size": 11, "letter-spacing": ".12em",
+      transform: "rotate(-90 13 " + (m.t + ih / 2) + ")" }, "RAINFALL (mm/day)"));
+
+    for (let d = days - 1; d >= 0; d -= 7) {
+      const back = days - 1 - d;
+      svg.appendChild(el("text", { x: x(d) + bw / 2, y: m.t + ih + 17, fill: ink3,
+        "text-anchor": "middle", "font-family": "var(--mono)", "font-size": 10.5 },
+        back === 0 ? "0" : "−" + back));
+    }
+    svg.appendChild(el("text", { x: m.l + iw / 2, y: H - 8, fill: ink2, "text-anchor": "middle",
+      "font-family": "var(--display)", "font-size": 11, "letter-spacing": ".12em" },
+      "DAYS BEFORE THE SLIDE"));
+
+    c.daily.forEach((v, i) => {
+      if (v == null) {
+        svg.appendChild(el("rect", { x: x(i) + bw * .18, y: m.t + ih - 3, width: Math.max(1, bw * .64),
+          height: 3, fill: ink3, opacity: .35 }));
+        return;
+      }
+      if (v <= 0) return;
+      svg.appendChild(el("rect", { x: x(i) + bw * .18, y: y(v), width: Math.max(1, bw * .64),
+        height: Math.max(1, m.t + ih - y(v)), fill: tone, opacity: .85 }));
+    });
+
+    // the window the model is currently reading
+    const wStart = Math.max(0, days - S.winDays);
+    svg.appendChild(el("rect", { x: x(wStart), y: m.t, width: m.l + iw - x(wStart), height: ih,
+      fill: tone, opacity: .07 }));
+    svg.appendChild(el("line", { x1: x(wStart), y1: m.t, x2: x(wStart), y2: m.t + ih,
+      stroke: tone, "stroke-width": 1, "stroke-dasharray": "4 3", opacity: .7 }));
+
+    const hit = el("rect", { x: m.l, y: m.t, width: iw, height: ih, fill: "transparent",
+      style: "cursor:crosshair" });
+    hit.addEventListener("pointermove", ev => {
+      const box = svg.getBoundingClientRect();
+      const sx = (ev.clientX - box.left) * (W / box.width);
+      const i = Math.max(0, Math.min(days - 1, Math.floor((sx - m.l) / bw)));
+      const v = c.daily[i], back = days - 1 - i;
+      tip.innerHTML = '<span class="th">' + (back === 0 ? "day of the slide" : back + " days before") + "</span>" +
+        '<div class="row">Rainfall<u>' + (v == null ? "not reported" : fmt(v, 1) + " mm") + "</u></div>";
+      const hostBox = host.getBoundingClientRect();
+      placeTip(tip, host, box.left - hostBox.left + (x(i) + bw / 2) / W * box.width,
+        box.top - hostBox.top + (v == null ? m.t + ih : y(v)) / H * box.height - 4);
+    });
+    hit.addEventListener("pointerleave", () => { tip.style.opacity = 0; });
+    svg.appendChild(hit);
+
+    host.replaceChildren(tip, svg);
+
+    const w = caseRain(c, S.winDays);
+    keys.innerHTML =
+      "<span><b>" + c.site + "</b> · " + c.date + "</span>" +
+      "<span>" + c.network + " gauge " + c.gauge + ", " + fmt(c.km, 0) + " km away</span>" +
+      "<span>shaded: last " + int(S.winDays) + " days, " +
+        (w.mm == null ? "too sparse to total" : fmt(w.mm, 0) + " mm over " + int(w.seen) + " reported days") + "</span>";
+  }
+
+  function drawCaseTable() {
+    const dry = pfAtHead(0);
+    document.getElementById("caseBody").innerHTML = CASES.slice()
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(c => {
+        const tone = "var(" + BLAME[c.implicated].tone + ")";
+        const w = caseRain(c, S.winDays);
+        const rise = impliedRise(c);
+        const head = rise == null ? null : Math.min(rise, S.z);
+        const pf = head == null ? null : pfAtHead(head);
+        const on = c.id === picked;
+        return '<tr data-id="' + c.id + '" style="cursor:pointer' + (on ? ";background:var(--accent-soft)" : "") + '">' +
+          '<th scope="row"><span style="background:' + tone + '"></span>' + c.short + "</th>" +
+          "<td>" + c.date + "</td>" +
+          "<td>" + (w.mm == null ? "—" : fmt(w.mm, 0) + " mm") + "</td>" +
+          "<td>" + (c.p30pct != null ? ord(c.p30pct)
+                  : c.p7pct != null ? ord(c.p7pct) + "*" : "—") + "</td>" +
+          "<td>" + (rise == null ? "—" : fmt(rise, 2) + " m") + "</td>" +
+          "<td>" + (pf == null ? "—" : pct(pf) + " %") + "</td>" +
+          "<td>" + (pf == null ? "—" : "+" + fmt((pf - dry) * 100, 1) + " pts") + "</td>" +
+          "<td>" + BLAME[c.implicated].tag + "</td>" +
+        "</tr>";
+      }).join("");
+
+    document.querySelectorAll("#caseBody tr").forEach(tr => {
+      tr.addEventListener("click", () => {
+        picked = tr.getAttribute("data-id"); drawCases(); drawHyeto(); drawCaseTable();
+      });
+    });
+
+    document.getElementById("caseNote").innerHTML =
+      "<span>ΔH = infiltration ratio × rainfall ÷ drainable porosity — currently " +
+        fmt(S.infil, 2) + " × depth ÷ " + fmt(S.nDrain, 2) + " over " + int(S.winDays) + " days, capped at z = " + fmt(S.z, 1) + " m</span>" +
+      "<span>Lift is measured against a dry liner, which this slope fails at " + pct(dry) + "% of the time on its own</span>" +
+      "<span>Percentile is the 30-day rank, or the 7-day rank where marked *; — means no gauge or too short a record</span>";
+  }
+
   /* ============================ cards + table ============================ */
 
   function drawCards() {
@@ -1410,6 +1758,9 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
     drawCards();
     drawHist();
     drawSweep();
+    drawCases();
+    drawHyeto();
+    drawCaseTable();
     drawTable();
   }
 

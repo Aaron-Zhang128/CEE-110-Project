@@ -1,0 +1,2 @@
+# NOAA downloads, ~150 MB. Rebuilt on demand by build_antecedent_rainfall.py.
+.ghcn-cache/
