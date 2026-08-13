@@ -140,6 +140,20 @@ python3 data/build_antecedent_rainfall.py    # NOAA -> data/antecedent-rainfall.
 python3 data/embed_cases.py                  # -> back into index.html
 ```
 
+## Figures
+
+The page is interactive; a report is not. `data/make_figures.py` draws the same three
+charts as files, using pandas and matplotlib:
+
+```
+pip install pandas matplotlib
+python3 data/make_figures.py                 # all three -> figures/
+python3 data/make_figures.py --figure hyetograph --case leuwigajah2005
+python3 data/make_figures.py --format pdf --dpi 300
+```
+
+![The supplied daily rainfall sample, its fitted lognormal, and the accumulation that follows](figures/site-rainfall.png)
+
 ## Notes
 
 The "Acceptable / Marginal / High / Critical" labels on the scenario cards are a display

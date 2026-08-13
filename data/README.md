@@ -26,6 +26,32 @@ Delete the cache to force a clean re-pull.
 | `antecedent-rainfall.json` | The same, plus `daily_mm` — the 45-day daily series the page plots. |
 | `build_antecedent_rainfall.py` | Finds the gauge, pulls the record, computes the totals and ranks. |
 | `embed_cases.py` | Writes the joined data into `index.html`, which is offline-only. |
+| `make_figures.py` | Renders the same charts as standalone files, with pandas and matplotlib. |
+
+## Figures for a report
+
+`make_figures.py` draws the three charts as image files, so they can go into a
+document without screenshotting the page. It needs `pandas` and `matplotlib`.
+
+```
+python3 make_figures.py                                  # all three -> ../figures
+python3 make_figures.py --figure percentile
+python3 make_figures.py --figure hyetograph --case leuwigajah2005
+python3 make_figures.py --figure site-rainfall --window 15
+python3 make_figures.py --format pdf --dpi 300           # for print
+```
+
+| Figure | What it draws |
+| --- | --- |
+| `site-rainfall` | The supplied daily sample and its fitted lognormal on a log axis, beside the window accumulation that fit implies. |
+| `percentile` | Antecedent rainfall rank at each failure, coloured by what the published account blamed. |
+| `hyetograph` | Daily rain for the six weeks before one failure, with unreported days shaded. |
+
+`--window` changes the accumulation length for the site-rainfall figure and the
+shaded region on the hyetograph. `--seed` fixes the Monte Carlo draw. The
+site-rainfall figure is plotted as density per unit ln(rainfall), which is the
+form whose area is probability on a log axis — and which puts the peak of the
+curve on the median, so the fit check is visible rather than asserted.
 
 ## Site rainfall — `site-rainfall.csv`
 
