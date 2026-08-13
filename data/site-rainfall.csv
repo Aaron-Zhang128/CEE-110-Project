@@ -1,0 +1,16 @@
+kind,statistic,value,unit,note
+observed,mean,2.24,mm/day,
+observed,median,0.69,mm/day,
+observed,mode,0.01,mm/day,equal to the minimum — looks like a reporting floor rather than a true mode
+observed,standard_deviation,7.12,mm/day,
+observed,variance,50.73,(mm/day)^2,consistent with the standard deviation (7.12^2 = 50.69)
+observed,minimum,0.01,mm/day,
+observed,maximum,35.43,mm/day,
+derived,coefficient_of_variation,3.179,-,sd/mean — rules out the exponential, which requires 1
+fitted,distribution,lognormal,-,fitted by matching the mean and standard deviation only
+fitted,mu,-0.3971,ln(mm/day),location parameter of ln(rainfall)
+fitted,sigma,1.5515,ln(mm/day),scale parameter of ln(rainfall)
+check,predicted_median,0.672,mm/day,against the observed 0.69 — 2.6% off, and the median was not used in the fit
+check,predicted_mode,0.061,mm/day,against the observed 0.01; mode is the weakest statistic to fit from binned data
+check,gamma_predicted_median,0.013,mm/day,a gamma on the same two moments misses the observed median by ~55x
+check,exceedance_of_observed_max,0.0053,-,P(day > 35.43 mm) under the fit — implies a record of roughly 190 days

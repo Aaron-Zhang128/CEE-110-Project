@@ -20,11 +20,53 @@ Delete the cache to force a clean re-pull.
 
 | File | What it is |
 | --- | --- |
+| `site-rainfall.csv` | Daily rainfall statistics for the modelled site, and the lognormal fitted to them. |
 | `landfill-failures.csv` | The case list. Hand-compiled, one row per failure, every row cited. |
 | `antecedent-rainfall.csv` | Generated. Rainfall before each failure, plus the gauge it came from. |
 | `antecedent-rainfall.json` | The same, plus `daily_mm` — the 45-day daily series the page plots. |
 | `build_antecedent_rainfall.py` | Finds the gauge, pulls the record, computes the totals and ranks. |
 | `embed_cases.py` | Writes the joined data into `index.html`, which is offline-only. |
+
+## Site rainfall — `site-rainfall.csv`
+
+A separate thing from the case histories: the daily rainfall distribution for the
+site being modelled, supplied as summary statistics rather than a raw series.
+
+| | mean | median | mode | sd | variance | min | max |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| mm/day | 2.24 | 0.69 | 0.01 | 7.12 | 50.73 | 0.01 | 35.43 |
+
+Fitting a **lognormal** to the mean and standard deviation *alone* gives
+μ = −0.3971, σ = 1.5515 on ln(rainfall), and therefore a predicted median of
+**0.672 mm/day against the observed 0.69** — 2.6% out, from a statistic the fit
+never saw. That is the check that matters, and it passes.
+
+The alternatives fail it:
+
+| Family | Verdict |
+| --- | --- |
+| Lognormal | Median 0.672 vs 0.69 observed. Accepted. |
+| Gamma | Same two moments give k = 0.099, median 0.013 — off by ~55×, and k < 1 puts the mode at zero. |
+| Exponential | Requires CV = 1; the sample has CV = 3.18. Rejected outright. |
+
+Which is convenient, because the model already draws cohesion and leachate head
+as lognormals, so rainfall joins the same family.
+
+Two things to be aware of:
+
+**The mode equals the minimum.** Both are 0.01 mm/day, which is what a reporting
+floor looks like, not a mode — a lognormal's mode is 0.061 here. The mode is also
+the least reliable statistic to recover from binned data. Nothing depends on it.
+
+**Whether dry days are included is unresolved.** A median of 0.69 mm/day means
+over half of all days recorded meaningful rain, which is wet. If the sample
+counted rain days only, the annual total implied by treating every day this way
+(2.24 × 365 ≈ 820 mm) is an overestimate, and the wet-day fraction control on the
+page exists to correct it: set it to the share of days that were wet and the
+window accumulation scales accordingly. At 1.00 — the default — every day in the
+window draws from the fitted distribution.
+
+The site and period this sample came from are not recorded here. Worth adding.
 
 ## Where the rainfall comes from
 

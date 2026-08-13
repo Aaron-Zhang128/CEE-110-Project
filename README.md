@@ -46,6 +46,7 @@ The probability of failure is the share of samples with FS ≤ 1.
 | Slope angle `β` | fixed | 25° | |
 | Depth to slip plane `z` | fixed | 10 m | vertical depth |
 | Leachate unit weight `γ_w` | fixed | 9.81 kN/m³ | |
+| Daily rainfall | lognormal | mean 2.24 mm/day, sd 7.12 | site sample; drives the rainfall case |
 
 Material properties are drawn **once** and shared by all three scenarios, so the only
 thing separating them is how much leachate sits above the liner — the comparison is a
@@ -70,6 +71,26 @@ exactly.
 
 Every input on the left is adjustable, including sample count (1 000–100 000) and seed;
 everything recomputes as you drag.
+
+## Site rainfall
+
+The site's daily rainfall is supplied as summary statistics — mean 2.24 mm/day,
+median 0.69, sd 7.12, min 0.01, max 35.43 — and fitted as a lognormal from the mean
+and standard deviation alone. The fit predicts a median of 0.672 against the observed
+0.69, 2.6% out, and it never saw the median. A gamma on the same two moments misses
+it by 55×; an exponential is rejected by the coefficient of variation (3.18, not 1).
+
+The page samples that distribution day by day across the antecedent window, converts
+the accumulated depth to a leachate head with the same infiltration and porosity
+coefficients used for the real failures, and reports the failure probability that
+rainfall alone produces. With the defaults, a 30-day window gives a median of about
+58 mm and a mean head of 0.20 m — this site's ordinary month barely moves the slope,
+and what risk there is lives in the tail.
+
+Two caveats are exposed as controls rather than buried: days are drawn independently,
+so real storm clustering is not reproduced and the spread of the window total is a
+floor; and if the sample counted rain days only, the wet-day fraction slider scales
+the accumulation to match.
 
 ## The observed failures
 
