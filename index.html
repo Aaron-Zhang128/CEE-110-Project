@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<meta name="description" content="Monte Carlo simulation of landfill slope stability under a rising leachate head.">
-<title>Landfill Slope Reliability — Monte Carlo</title>
+<meta name="description" content="TRIGRS transient rainfall infiltration and Monte Carlo slope reliability for a lined landfill.">
+<title>Landfill Slope Reliability — TRIGRS + Monte Carlo</title>
 <style>
   :root {
     color-scheme: light;
@@ -566,9 +566,9 @@
 <div class="shell">
   <header class="masthead">
     <div>
-      <p class="eyebrow">Infinite-slope reliability · Monte Carlo</p>
-      <h1>Landfill slope stability under a rising leachate head</h1>
-      <p class="standfirst">Ten thousand synthetic slopes per scenario. Cohesion, friction angle and unit weight are drawn once and shared across all three scenarios, so the only thing separating them is how much leachate sits above the liner.</p>
+      <p class="eyebrow">TRIGRS transient infiltration · Monte Carlo</p>
+      <h1>Landfill slope stability under transient rainfall infiltration</h1>
+      <p class="standfirst">Rainfall is pushed into the waste with the TRIGRS v2.0 saturated model — Iverson's linearised solution for the pressure head that arrives at the slip surface — and the resulting head is carried into the infinite-slope factor of safety. Cohesion, friction angle and unit weight are drawn once and shared across all three scenarios, so the only thing separating them is the rain and the drainage.</p>
     </div>
     <div class="runstate" id="runstate"></div>
   </header>
@@ -587,12 +587,23 @@
       <section class="card">
         <div class="card-head">
           <h2>Cross-section</h2>
-          <p>The slab of waste above the liner, drawn to the current geometry. Each coloured line is one scenario's mean leachate head.</p>
+          <p>The slab of waste above the liner, drawn to the current geometry. Each coloured line is one scenario's water table before the storm — the depth <span class="lc">d</span> that TRIGRS starts from.</p>
         </div>
         <div class="card-body plot" id="sectionPlot"></div>
       </section>
 
       <div class="cards" id="cards"></div>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Pressure head through the storm</h2>
+          <p>ψ at the slip surface, hour by hour, as the wetting front diffuses down from the surface. The head keeps climbing after the rain stops — that lag is the whole point of a transient model, and it is what a fixed leachate head cannot show. The dashed line is where the median sample reaches FS = 1.</p>
+        </div>
+        <div class="card-body plot" id="psiPlot">
+          <div class="tip" id="psiTip"></div>
+        </div>
+        <div class="keys" id="psiKeys"></div>
+      </section>
 
       <section class="card">
         <div class="card-head">
@@ -607,18 +618,19 @@
 
       <section class="card">
         <div class="card-head">
-          <h2>Sensitivity to leachate head</h2>
-          <p>Failure probability as the mean head sweeps from a dry liner to a fully saturated slab, holding the baseline scenario's coefficient of variation. Markers sit at each scenario's own result, which uses its own spread — so they land near the curve, not exactly on it.</p>
+          <h2>Sensitivity to rainfall</h2>
+          <p>Failure probability as the storm intensity sweeps from nothing upward, one curve per scenario water table. The gap between the curves is what drainage buys you: the same rain on a slope drained two metres deeper is a different risk. Each curve flattens once ψ hits its ceiling at the ground surface.</p>
         </div>
         <div class="card-body plot" id="sweepPlot">
           <div class="tip" id="sweepTip"></div>
         </div>
+        <div class="keys" id="sweepKeys"></div>
       </section>
 
       <section class="card">
         <div class="card-head">
           <h2>Site rainfall</h2>
-          <p>Daily rainfall at the site, fitted as a lognormal from the sample mean and standard deviation alone, then accumulated over the antecedent window to drive the leachate head. The fitted median is a genuine check: it was never used in the fit, so it either lands on the sample median or the family is wrong. Days are drawn independently, which no real rainfall record is — storms cluster — so treat the spread of the window total as a lower bound. If the sample counted only rain days, drop the wet-day fraction on the left to match.</p>
+          <p>Daily rainfall at the site, fitted as a lognormal from the sample mean and standard deviation alone, then run day by day through the same TRIGRS response that drives the scenarios. The fitted median is a genuine check: it was never used in the fit, so it either lands on the sample median or the family is wrong. Days are drawn independently, which no real rainfall record is — storms cluster — so treat the spread of the window total as a lower bound. If the sample counted only rain days, drop the wet-day fraction on the left to match.</p>
         </div>
         <div class="card-body plot" id="rainPlot">
           <div class="tip" id="rainTip"></div>
@@ -664,7 +676,7 @@
       <section class="card">
         <div class="card-head">
           <h2>Observed rainfall through the model</h2>
-          <p>The measured antecedent rainfall of each real failure, converted to a head rise by the two coefficients on the left, then run through this slope's failure curve. The head is taken as rainfall alone on a dry liner, so the last column is what that rain adds by itself. It answers a narrow question — given only how much rain fell, what would this model have said? — so a low number next to a real disaster is a statement about the model, not about the site.</p>
+          <p>The measured daily rainfall before each real failure, fed into TRIGRS one day at a time and superposed at the failure date, on this slope's baseline water table. It answers a narrow question — given only the rain that fell, and this slope's geometry and waste, what would the model have said? — so a low number next to a real disaster is a statement about the model, not about the site.</p>
         </div>
         <div class="card-body tablewrap">
           <table id="caseTable">
@@ -674,7 +686,8 @@
                 <th scope="col">Date</th>
                 <th scope="col">Rain</th>
                 <th scope="col">Pctl</th>
-                <th scope="col">Implied <span class="lc">Δ</span>H</th>
+                <th scope="col">TRIGRS <span class="lc">Δψ</span></th>
+                <th scope="col"><span class="lc">ψ</span> at Z</th>
                 <th scope="col">Modelled P(f)</th>
                 <th scope="col">Lift vs dry</th>
                 <th scope="col">Rain blamed</th>
@@ -696,7 +709,8 @@
             <thead>
               <tr>
                 <th scope="col" style="text-align:left">Scenario</th>
-                <th scope="col">Mean head</th>
+                <th scope="col">Rainfall</th>
+                <th scope="col"><span class="lc">ψ</span> at Z</th>
                 <th scope="col">Mean FS</th>
                 <th scope="col">Median FS</th>
                 <th scope="col">Std dev FS</th>
@@ -714,14 +728,17 @@
       <section class="card">
         <div class="card-head"><h2>Method</h2></div>
         <div class="card-body method">
-          <div class="eq">σ  = γ·z·cos²β                    total normal stress on the slip plane
-u  = γ_w·H·cos²β                  pore pressure from the leachate head
-σ′ = max(σ − u, 0)                effective normal stress
-τ_r = c′ + σ′·tan φ′               shear resistance
-τ_d = γ·z·sin β·cos β              driving shear stress
-FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
-          <p>Cohesion and leachate head are lognormal, so they stay positive and skew right. Friction angle and unit weight are normal, clipped to 1–50° and to a floor of 1 kN/m³ respectively. Head is capped at the slab depth — the leachate cannot rise above the waste.</p>
-          <p>The random number stream is seeded, so a given seed and sample count reproduce exactly. Material properties are drawn once and reused by all three scenarios, which is what makes the comparison a controlled one: the same ten thousand slopes, wetter or drier.</p>
+          <div class="eq">D_1    = D_0 / cos²δ                          vertical diffusivity
+β      = cos²δ − I_ZLT/K_S                    steady-state gradient
+Rf(τ)  = 2√(D_1·τ/π)·exp(−Z²/4D_1τ) − Z·erfc[ Z / 2√(D_1·τ) ]
+ψ(Z,t) = (Z − d)·β  +  Σ (I_n/K_S)·[ Rf(t−t_n) − Rf(t−t_n₊₁) ]
+FS(Z,t) = tan φ′/tan δ  +  [ c′ − ψ(Z,t)·γ_w·tan φ′ ] / [ γ_s·Z·sin δ·cos δ ]
+
+failure when FS ≤ 1</div>
+          <p>This is TRIGRS v2.0 (Baum, Savage &amp; Godt, USGS Open-File Report 2008-1159) in its saturated form: Iverson's (2000) linearised solution to Richards' equation, with each day of rain entering as its own rainfall period and the periods superposed. <em>Z</em> and <em>d</em> are vertical depths; surface flux is capped at <em>K_S</em> and the excess runs off; ψ is capped at <em>Z</em>·cos²δ, which is the water table standing at the ground surface. Above the water table ψ is negative — the saturated model reports that suction rather than solving the unsaturated zone, which is TRIGRS's own caveat for this option.</p>
+          <p>The factor of safety is TRIGRS's infinite-slope form, unchanged from the previous version of this page. What changed is where ψ comes from: it used to be a number you assumed, and is now a number the rainfall produces.</p>
+          <p>Cohesion is lognormal, so it stays positive and skews right; friction angle and unit weight are normal, clipped to 1–50° and to a floor of 1 kN/m³. The hydraulic properties are deterministic, as they are in TRIGRS, where they are grid values rather than random variables — so ψ is one number per scenario and the Monte Carlo runs over strength alone. Because FS falls monotonically with ψ, each sample has a single pressure head at which it reaches FS = 1; those are sorted once, which is what makes every curve on this page exact rather than resampled.</p>
+          <p>The random number stream is seeded, so a given seed and sample count reproduce exactly. Material properties are drawn once and reused by all three scenarios, which is what makes the comparison a controlled one: the same ten thousand slopes, wetter or better drained.</p>
         </div>
       </section>
     </div>
@@ -762,12 +779,31 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
   ];
   // CASES-END
 
-  /* ============================ model ============================ */
+  /* ============================ model ============================
+
+     TRIGRS — Transient Rainfall Infiltration and Grid-Based Regional
+     Slope-Stability analysis, version 2.0 (Baum, Savage & Godt, USGS
+     Open-File Report 2008-1159). Saturated case: Iverson's (2000)
+     linearised solution for the pressure head that rainfall drives into
+     an infinite slope, then TRIGRS's infinite-slope factor of safety.
+
+       D_1    = D_0 / cos²δ                          vertical diffusivity
+       β      = cos²δ − I_ZLT/K_S                    steady-state gradient
+       Rf(τ)  = 2√(D_1τ/π)·exp(−Z²/4D_1τ) − Z·erfc[ Z / 2√(D_1τ) ]
+       ψ(Z,t) = (Z − d)·β + Σ (I_n/K_S)·[ Rf(t−t_n) − Rf(t−t_n+1) ]
+       FS     = tanφ′/tanδ + [ c′ − ψ·γ_w·tanφ′ ] / [ γ_s·Z·sinδ·cosδ ]
+
+     Z and d are vertical depths. Surface flux is capped at K_S, the rest
+     runs off; ψ is capped at Z·cos²δ, the water table at the surface.
+
+     What is random and what is not follows TRIGRS: the hydraulic
+     properties are deterministic grid values, so ψ(Z,t) is one number per
+     scenario, and the Monte Carlo runs over the strength properties. */
 
   const SCEN = [
-    { key: "baseline",   name: "Baseline",       tone: "--s1", fill: "--s1-fill", hMean: 3,   hSd: 1.5 },
-    { key: "heavy",      name: "Heavy rainfall", tone: "--s2", fill: "--s2-fill", hMean: 4.5, hSd: 2   },
-    { key: "mitigation", name: "Mitigation",     tone: "--s3", fill: "--s3-fill", hMean: 2.5, hSd: 1.2 }
+    { key: "baseline",   name: "Baseline",       tone: "--s1", fill: "--s1-fill", rain: 5,  dwt: 6.5 },
+    { key: "heavy",      name: "Heavy rainfall", tone: "--s2", fill: "--s2-fill", rain: 30, dwt: 6.5 },
+    { key: "mitigation", name: "Mitigation",     tone: "--s3", fill: "--s3-fill", rain: 30, dwt: 8.5 }
   ];
 
   const GROUPS = [
@@ -776,9 +812,9 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
       unit: "fixed",
       hint: "Deterministic geometry — the same for every sample.",
       items: [
-        { k: "beta",  label: "Slope angle β",            u: "°",      min: 5,   max: 45, step: 0.5,  def: 25   },
-        { k: "z",     label: "Depth to slip plane z",    u: "m",      min: 2,   max: 30, step: 0.5,  def: 10   },
-        { k: "gw",    label: "Leachate unit weight γ_w", u: "kN/m³",  min: 8,   max: 11, step: 0.01, def: 9.81 }
+        { k: "beta",  label: "Slope angle δ",            u: "°",      min: 5,   max: 45, step: 0.5,  def: 25   },
+        { k: "z",     label: "Slip depth Z",             u: "m",      min: 2,   max: 30, step: 0.5,  def: 10   },
+        { k: "gw",    label: "Water unit weight γ_w",    u: "kN/m³",  min: 8,   max: 11, step: 0.01, def: 9.81 }
       ]
     },
     {
@@ -790,18 +826,19 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
         { k: "cSd",     label: "Cohesion c′ — std dev",    u: "kPa",    min: 0.1, max: 30, step: 0.1, def: 7.2  },
         { k: "phiMean", label: "Friction φ′ — mean",       u: "°",      min: 5,   max: 50, step: 0.1, def: 32   },
         { k: "phiSd",   label: "Friction φ′ — std dev",    u: "°",      min: 0,   max: 25, step: 0.1, def: 10.9 },
-        { k: "gMean",   label: "Unit weight γ — mean",     u: "kN/m³",  min: 5,   max: 25, step: 0.1, def: 10.5 },
-        { k: "gSd",     label: "Unit weight γ — std dev",  u: "kN/m³",  min: 0,   max: 8,  step: 0.1, def: 2.5  }
+        { k: "gMean",   label: "Unit weight γ_s — mean",   u: "kN/m³",  min: 5,   max: 25, step: 0.1, def: 10.5 },
+        { k: "gSd",     label: "Unit weight γ_s — std dev",u: "kN/m³",  min: 0,   max: 8,  step: 0.1, def: 2.5  }
       ]
     },
     {
-      title: "Rainfall response",
-      unit: "observed → head",
-      hint: "Turns rain into a head rise. Crude on purpose — two numbers you can argue with.",
+      title: "TRIGRS hydraulics",
+      unit: "deterministic",
+      hint: "The waste's conductivity and diffusivity, and the background flux the slope carries between storms. D_0/K_S sets how fast the wetting front reaches the slip surface.",
       items: [
-        { k: "infil",  label: "Infiltration ratio",   u: "of rainfall", min: 0.02, max: 1,    step: 0.01, def: 0.3  },
-        { k: "nDrain", label: "Drainable porosity",   u: "of volume",   min: 0.02, max: 0.4,  step: 0.01, def: 0.1  },
-        { k: "winDays", label: "Antecedent window",  u: "days",        min: 3,    max: 45,   step: 1,    def: 30   }
+        { k: "Ks",      label: "Conductivity K_S",         u: "m/s",     min: -7, max: -3, step: 0.05, def: 1e-5, log: true },
+        { k: "D0",      label: "Diffusivity D_0",          u: "m²/s",    min: -6, max: -1, step: 0.05, def: 5e-4, log: true },
+        { k: "Izlt",    label: "Long-term flux I_ZLT",     u: "mm/day",  min: 0,  max: 20, step: 0.1,  def: 1    },
+        { k: "winDays", label: "Storm / antecedent window",u: "days",    min: 3,  max: 45, step: 1,    def: 30   }
       ]
     },
     {
@@ -820,11 +857,16 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
   const RAIN_SAMPLE = { mean: 2.24, median: 0.69, mode: 0.01, sd: 7.12,
                         variance: 50.73, min: 0.01, max: 35.43 };
 
-  const HEAD_LIMITS = { min: 0.1, max: 30, step: 0.1, sdMin: 0.05, sdMax: 15 };
+  const RAIN_LIMITS = { min: 0, max: 200, step: 0.5 };
+  const DWT_LIMITS  = { min: 0, max: 30,  step: 0.1 };
+
+  const DAY = 86400;                 // s
+  const MMD = 86400000;              // mm/day -> m/s divisor
+  const SQRTPI = Math.sqrt(Math.PI);
 
   const S = { N: 10000, seed: 42 };
   GROUPS.forEach(g => g.items.forEach(it => { S[it.k] = it.def; }));
-  SCEN.forEach(s => { S[s.key + "Mean"] = s.hMean; S[s.key + "Sd"] = s.hSd; });
+  SCEN.forEach(s => { S[s.key + "Rain"] = s.rain; S[s.key + "Dwt"] = s.dwt; });
 
   function mulberry32(a) {
     return function () {
@@ -861,6 +903,14 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
     const lo = Math.floor(idx), hi = Math.ceil(idx);
     return lo === hi ? sorted[lo] : sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
   }
+  // complementary error function — Numerical Recipes erfcc, |err| < 1.2e-7
+  function erfc(x) {
+    const z = Math.abs(x), t = 1 / (1 + 0.5 * z);
+    const y = t * Math.exp(-z * z - 1.26551223 + t * (1.00002368 + t * (0.37409196 +
+      t * (0.09678418 + t * (-0.18628806 + t * (0.27886807 + t * (-1.13520398 +
+      t * (1.48851587 + t * (-0.82215223 + t * 0.17087277)))))))));
+    return x >= 0 ? y : 2 - y;
+  }
 
   let R = null;
 
@@ -868,8 +918,9 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
     const N = S.N;
     const rand = mulberry32(S.seed >>> 0);
     const gauss = normalStream(rand);
-    const beta = S.beta * Math.PI / 180;
-    const cosB = Math.cos(beta), sinB = Math.sin(beta), cos2 = cosB * cosB;
+    const delta = S.beta * Math.PI / 180;
+    const cosD = Math.cos(delta), sinD = Math.sin(delta);
+    const cos2 = cosD * cosD, tanD = sinD / cosD;
 
     // --- material properties: drawn once, shared by every scenario ---
     const [cMu, cSig] = lognormalParams(S.cMean, S.cSd);
@@ -882,55 +933,97 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
       tanPhi[i] = Math.tan(a * Math.PI / 180);
     }
 
-    const sigmaTot = new Float64Array(N);
-    const driving = new Float64Array(N);
+    const driving = new Float64Array(N);              // γ_s·Z·sinδ·cosδ
     for (let i = 0; i < N; i++) {
       const g = Math.max(1, S.gMean + S.gSd * gauss());
-      sigmaTot[i] = g * S.z * cos2;
-      driving[i] = g * S.z * sinB * cosB;
+      driving[i] = g * S.z * sinD * cosD;
     }
 
-    const evaluate = (head) => {
+    // the pressure head at which each sample sits exactly at FS = 1
+    const psiCrit = new Float64Array(N);
+    for (let i = 0; i < N; i++)
+      psiCrit[i] = (cohesion[i] - driving[i] * (1 - tanPhi[i] / tanD)) / (S.gw * tanPhi[i]);
+    const psiCritSorted = psiCrit.slice().sort();
+
+    const evaluate = psi => {                          // FS across samples, one head
       const FS = new Float64Array(N);
-      for (let i = 0; i < N; i++) {
-        const eff = Math.max(sigmaTot[i] - S.gw * head[i] * cos2, 0);
-        FS[i] = (cohesion[i] + eff * tanPhi[i]) / driving[i];
-      }
+      for (let i = 0; i < N; i++)
+        FS[i] = tanPhi[i] / tanD + (cohesion[i] - psi * S.gw * tanPhi[i]) / driving[i];
       return FS;
     };
+    const pfAt = psi => {                              // share failing at that head
+      let lo = 0, hi = N;
+      while (lo < hi) { const mid = (lo + hi) >> 1; if (psiCritSorted[mid] <= psi) lo = mid + 1; else hi = mid; }
+      return lo / N;
+    };
 
-    // --- one scenario at a time, in order, off the same stream ---
+    // --- TRIGRS infiltration ---
+    const K = S.Ks;                                    // m/s
+    const D1 = S.D0 / cos2;                            // m²/s in the vertical
+    const Izlt = Math.min(S.Izlt / MMD, 0.99 * K);
+    const betaT = cos2 - Izlt / K;
+    const psiCap = S.z * cos2;                         // water table at the surface
+    const days = Math.round(S.winDays);
+    const winSec = days * DAY;
+
+    const Rf = tau => {
+      if (!(tau > 0)) return 0;
+      const s = Math.sqrt(D1 * tau);
+      return 2 * s / SQRTPI * Math.exp(-(S.z * S.z) / (4 * D1 * tau)) - S.z * erfc(S.z / (2 * s));
+    };
+    const steady = d => (S.z - d) * betaT;             // pre-storm head at Z
+    const capPsi = p => Math.min(p, psiCap);
+
+    // one rainfall period of constant intensity, head read at time t
+    const psiOf = (d, mmPerDay, t) => {
+      const I = Math.min(mmPerDay / MMD, K);
+      return capPsi(steady(d) + (I / K) * (Rf(t) - Rf(t - winSec)));
+    };
+
+    // per-day weights: ψ_transient = Σ I_n·kern[n], oldest day first
+    const kern = new Float64Array(days);
+    let kernSum = 0;
+    for (let n = 0; n < days; n++) {
+      kern[n] = (Rf((days - n) * DAY) - Rf((days - n - 1) * DAY)) / K;
+      kernSum += kern[n];
+    }
+
+    // --- one scenario at a time ---
+    const TAIL = 1.35, STEPS = 96;
     const runs = SCEN.map(sc => {
-      const hMean = S[sc.key + "Mean"], hSd = S[sc.key + "Sd"];
-      const [hMu, hSig] = lognormalParams(hMean, hSd);
-      const head = new Float64Array(N);
-      let headSum = 0;
-      for (let i = 0; i < N; i++) {
-        const h = Math.min(Math.exp(hMu + hSig * gauss()), S.z);
-        head[i] = h;
-        headSum += h;
+      const mmd = S[sc.key + "Rain"], d = S[sc.key + "Dwt"];
+      const psi = psiOf(d, mmd, winSec);
+      const FS = evaluate(psi);
+
+      const series = [];
+      for (let s = 0; s <= STEPS; s++) {
+        const t = winSec * TAIL * s / STEPS;
+        series.push({ day: t / DAY, psi: psiOf(d, mmd, t) });
       }
-      const FS = evaluate(head);
 
       let sum = 0, fails = 0;
       for (let i = 0; i < N; i++) { sum += FS[i]; if (FS[i] <= 1) fails++; }
       const mean = sum / N;
       let ss = 0;
-      for (let i = 0; i < N; i++) { const d = FS[i] - mean; ss += d * d; }
+      for (let i = 0; i < N; i++) { const d2 = FS[i] - mean; ss += d2 * d2; }
       const sd = Math.sqrt(ss / Math.max(N - 1, 1));
       const sorted = FS.slice().sort();
 
       return {
         ...sc,
-        FS, sorted,
-        mean, sd,
+        FS, sorted, mean, sd,
         median: quantile(sorted, 0.5),
         p05: quantile(sorted, 0.05),
         p995: quantile(sorted, 0.995),
         fails,
         pf: fails / N,
-        headMeanActual: headSum / N,
-        headMeanInput: hMean
+        psi,
+        psiSteady: steady(d),
+        rise: psi - steady(d),
+        series,
+        dwt: d,
+        mmd,
+        runoff: mmd / MMD > K
       };
     });
 
@@ -950,61 +1043,62 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
       r.over = over;
     });
 
-    // --- Pf vs mean head, common random numbers for a smooth curve ---
-    const M = Math.min(N, 8000);
-    const cov = S.baselineSd / Math.max(S.baselineMean, 1e-9);
-    const sweepRand = mulberry32((S.seed >>> 0) ^ 0x9E3779B9);
-    const sweepGauss = normalStream(sweepRand);
-    const zH = new Float64Array(M);
-    for (let i = 0; i < M; i++) zH[i] = sweepGauss();
-
-    const STEPS = 36;
+    // --- P(failure) against storm intensity, one curve per water table ---
+    // the curve depends only on the water table, so scenarios that share one
+    // share a curve rather than drawing it twice
+    const rainMax = Math.max(60, ...SCEN.map(s => S[s.key + "Rain"])) * 1.6;
+    const SW = 60;
+    const byDepth = new Map();
     const sweep = [];
-    for (let s = 0; s <= STEPS; s++) {
-      const hm = 0.05 + (S.z - 0.05) * (s / STEPS);
-      const [mu, sig] = lognormalParams(hm, hm * cov);
-      let fails = 0;
-      for (let i = 0; i < M; i++) {
-        const h = Math.min(Math.exp(mu + sig * zH[i]), S.z);
-        const eff = Math.max(sigmaTot[i] - S.gw * h * cos2, 0);
-        if ((cohesion[i] + eff * tanPhi[i]) / driving[i] <= 1) fails++;
+    runs.forEach(r => {
+      const seen = byDepth.get(r.dwt);
+      if (seen) { seen.names.push(r.name); return; }
+      const pts = [];
+      for (let s = 0; s <= SW; s++) {
+        const mmd = rainMax * s / SW;
+        pts.push({ mmd, pf: pfAt(psiOf(r.dwt, mmd, winSec)) });
       }
-      sweep.push({ h: hm, pf: fails / M });
-    }
+      const entry = { name: r.name, names: [r.name], tone: r.tone, dwt: r.dwt, pts };
+      byDepth.set(r.dwt, entry);
+      sweep.push(entry);
+    });
 
-    // --- rainfall-driven case: head generated by the site's own rain ---
+    // --- the site's own rainfall, day by day, through the same kernel ---
     // Its own stream, so moving a rainfall slider never disturbs the material draws.
     const rainRand = mulberry32((S.seed >>> 0) ^ 0x85EBCA6B);
     const rainGauss = normalStream(rainRand);
     const [rMu, rSig] = lognormalParams(S.rainMean, S.rainSd);
-    const days = Math.round(S.winDays);
+    const baseD = S.baselineDwt, basePsi = steady(baseD);
     const accum = new Float64Array(N);
-    const rainHead = new Float64Array(N);
+    const rainRise = new Float64Array(N);
+    let rainFails = 0, accumSum = 0, riseSum = 0;
     for (let i = 0; i < N; i++) {
-      let mm = 0;
-      for (let d = 0; d < days; d++) {
+      let mm = 0, tr = 0;
+      for (let n = 0; n < days; n++) {
         // occurrence then intensity: a dry day contributes nothing
-        if (S.wetFrac >= 1 || rainRand() < S.wetFrac) mm += Math.exp(rMu + rSig * rainGauss());
+        const v = (S.wetFrac >= 1 || rainRand() < S.wetFrac) ? Math.exp(rMu + rSig * rainGauss()) : 0;
+        mm += v;
+        tr += Math.min(v / MMD, K) * kern[n];
       }
       accum[i] = mm;
-      rainHead[i] = Math.min((S.infil * mm / 1000) / S.nDrain, S.z);
-    }
-    const rainFS = evaluate(rainHead);
-    let rainFails = 0, accumSum = 0, headSum2 = 0;
-    for (let i = 0; i < N; i++) {
-      if (rainFS[i] <= 1) rainFails++;
-      accumSum += accum[i];
-      headSum2 += rainHead[i];
+      rainRise[i] = tr;
+      accumSum += mm;
+      riseSum += tr;
+      if (psiCrit[i] <= capPsi(basePsi + tr)) rainFails++;
     }
     const accumSorted = accum.slice().sort();
+    const riseSorted = rainRise.slice().sort();
     const rain = {
-      accum, accumSorted, head: rainHead, days,
+      accum, accumSorted, rise: rainRise, riseSorted, days,
       mean: accumSum / N,
       median: quantile(accumSorted, 0.5),
       p90: quantile(accumSorted, 0.9),
       p99: quantile(accumSorted, 0.99),
       max: accumSorted[N - 1],
-      headMean: headSum2 / N,
+      riseMean: riseSum / N,
+      riseMedian: quantile(riseSorted, 0.5),
+      rise99: quantile(riseSorted, 0.99),
+      basePsi,
       pf: rainFails / N,
       fails: rainFails,
       mu: rMu, sigma: rSig,
@@ -1012,7 +1106,14 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
       fitMode: Math.exp(rMu - rSig * rSig)
     };
 
-    R = { runs, hi, width, BINS, sweep, sweepM: M, cov, rain };
+    R = {
+      runs, hi, width, BINS, sweep, rain, rainMax,
+      psiCrit, psiCritSorted, pfAt, capPsi, steady, psiOf, Rf, kern, kernSum,
+      K, D1, betaT, psiCap, days, winSec, cos2, tanD,
+      psiCritMedian: quantile(psiCritSorted, 0.5),
+      psiCritP05: quantile(psiCritSorted, 0.05),
+      dryPf: pfAt(steady(baseD))
+    };
   }
 
   /* ============================ helpers ============================ */
@@ -1060,29 +1161,42 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
 
   /* ============================ control rail ============================ */
 
+  // spec.log puts the slider on a log10 scale: min/max are the exponents,
+  // the number box stays in the real units.
   function slider(spec) {
+    const lg = !!spec.log;
+    const vMin = lg ? Math.pow(10, spec.min) : spec.min;
+    const vMax = lg ? Math.pow(10, spec.max) : spec.max;
+    const toS = v => lg ? Math.log10(v) : v;
+    const show = v => lg ? Number(v).toExponential(1) : String(v);
+
     const wrap = document.createElement("div");
     wrap.className = "ctrl";
     const id = "c-" + spec.k;
     wrap.innerHTML =
       '<div class="ctrl-top"><label for="' + id + '">' + spec.label + (spec.u ? " <span style=\"color:var(--ink-3)\">(" + spec.u + ")</span>" : "") + "</label>" +
-      '<input class="num" type="number" inputmode="decimal" aria-label="' + spec.label + ' value" ' +
-      'min="' + spec.min + '" max="' + spec.max + '" step="' + spec.step + '" value="' + S[spec.k] + '"></div>' +
-      '<input id="' + id + '" type="range" min="' + spec.min + '" max="' + spec.max + '" step="' + spec.step + '" value="' + S[spec.k] + '">';
+      '<input class="num" type="' + (lg ? "text" : "number") + '" inputmode="decimal" aria-label="' + spec.label + ' value" ' +
+      (lg ? "" : 'min="' + spec.min + '" max="' + spec.max + '" step="' + spec.step + '" ') +
+      'value="' + show(S[spec.k]) + '"></div>' +
+      '<input id="' + id + '" type="range" min="' + spec.min + '" max="' + spec.max + '" step="' + spec.step + '" value="' + toS(S[spec.k]) + '">';
     const num = wrap.querySelector(".num");
     const rng = wrap.querySelector('input[type=range]');
     const push = (v, syncBoth) => {
       let x = Number(v);
       if (!isFinite(x)) return;
-      x = Math.min(spec.max, Math.max(spec.min, x));
+      x = Math.min(vMax, Math.max(vMin, x));
       S[spec.k] = x;
-      rng.value = String(x);
-      if (syncBoth) num.value = String(x);
+      rng.value = String(toS(x));
+      if (syncBoth) num.value = show(x);
       schedule();
     };
-    rng.addEventListener("input", () => { num.value = rng.value; push(rng.value, false); });
+    rng.addEventListener("input", () => {
+      const v = lg ? Math.pow(10, Number(rng.value)) : Number(rng.value);
+      num.value = show(v);
+      push(v, false);
+    });
     num.addEventListener("change", () => push(num.value, true));
-    wrap.reset = () => { num.value = String(S[spec.k]); rng.value = String(S[spec.k]); };
+    wrap.reset = () => { num.value = show(S[spec.k]); rng.value = String(toS(S[spec.k])); };
     return wrap;
   }
 
@@ -1102,16 +1216,16 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
 
     const fs = document.createElement("div");
     fs.className = "fieldset";
-    fs.innerHTML = '<div class="legend">Leachate scenarios <em>lognormal</em></div>' +
-                   '<p class="hint">Mean head above the liner, and its spread. Capped at the slab depth.</p>';
+    fs.innerHTML = '<div class="legend">Scenarios <em>rain + drainage</em></div>' +
+                   '<p class="hint">Rain falling over the window, and where the water table sits before it starts. Mitigation is the same storm on a slope that is drained deeper.</p>';
     SCEN.forEach(sc => {
       const head = document.createElement("div");
       head.className = "scen-head";
       head.innerHTML = '<span class="swatch" style="background:var(' + sc.tone + ')"></span><strong>' + sc.name + "</strong>";
       fs.appendChild(head);
       [
-        { k: sc.key + "Mean", label: "Mean head", u: "m", min: HEAD_LIMITS.min, max: HEAD_LIMITS.max, step: HEAD_LIMITS.step },
-        { k: sc.key + "Sd",   label: "Std dev",   u: "m", min: HEAD_LIMITS.sdMin, max: HEAD_LIMITS.sdMax, step: HEAD_LIMITS.step }
+        { k: sc.key + "Rain", label: "Rainfall I_Z",     u: "mm/day", min: RAIN_LIMITS.min, max: RAIN_LIMITS.max, step: RAIN_LIMITS.step },
+        { k: sc.key + "Dwt",  label: "Water table d",    u: "m deep", min: DWT_LIMITS.min,  max: DWT_LIMITS.max,  step: DWT_LIMITS.step }
       ].forEach(it => { const s = slider(it); resetters.push(s.reset); fs.appendChild(s); });
     });
     body.appendChild(fs);
@@ -1137,7 +1251,7 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
 
     document.getElementById("reset").addEventListener("click", () => {
       GROUPS.forEach(g => g.items.forEach(it => { S[it.k] = it.def; }));
-      SCEN.forEach(sc => { S[sc.key + "Mean"] = sc.hMean; S[sc.key + "Sd"] = sc.hSd; });
+      SCEN.forEach(sc => { S[sc.key + "Rain"] = sc.rain; S[sc.key + "Dwt"] = sc.dwt; });
       S.N = 10000; S.seed = 42;
       resetters.forEach(fn => fn());
       run.querySelector("#nsel").value = "10000";
@@ -1158,7 +1272,7 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
     const line2 = cssVar("--line-2"), panel = cssVar("--panel");
 
     const svg = el("svg", { viewBox: "0 0 " + W + " " + H, role: "img",
-      "aria-label": "Cross-section of the waste slab above the liner, with each scenario's mean leachate head drawn as a line" });
+      "aria-label": "Cross-section of the waste slab above the liner, with each scenario's pre-storm water table drawn as a line" });
 
     const defs = el("defs");
     const hatch = el("pattern", { id: "liner", width: 6, height: 6, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" });
@@ -1205,8 +1319,8 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
     poly([[ax, ay], [bx, by], [sbx, sby], [sax, say]],
       { fill: ink, "fill-opacity": .05, stroke: line2, "stroke-width": 1.25, "stroke-linejoin": "round" });
 
-    // saturated zone up to the wettest scenario mean
-    const deepest = Math.min(Math.max(...SCEN.map(s => S[s.key + "Mean"])), S.z);
+    // saturated zone up to the highest pre-storm water table
+    const deepest = Math.min(Math.max(...SCEN.map(s => S.z - S[s.key + "Dwt"])), S.z);
     const [wax, way] = P(0, deepest * cosB * scale), [wbx, wby] = P(L, deepest * cosB * scale);
     poly([[ax, ay], [bx, by], [wbx, wby], [wax, way]], { fill: ink, "fill-opacity": .13 });
 
@@ -1244,7 +1358,7 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
       }));
     });
     g.appendChild(el("text", { x: dimX - 8, y: linerY - zPix / 2 - 2, fill: ink, "text-anchor": "end",
-      "font-family": "var(--mono)", "font-size": 11 }, "z = " + fmt(S.z, 1) + " m"));
+      "font-family": "var(--mono)", "font-size": 11 }, "Z = " + fmt(S.z, 1) + " m"));
     g.appendChild(el("text", { x: dimX - 8, y: linerY - zPix / 2 + 12, fill: ink3, "text-anchor": "end",
       "font-family": "var(--mono)", "font-size": 9.5 }, "vertical depth"));
 
@@ -1264,14 +1378,15 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
       x: bx + labR * Math.cos(labA) + 2, y: by + labR * Math.sin(labA) + 4,
       fill: cssVar("--accent-ink"), "font-family": "var(--mono)", "font-size": 11,
       "paint-order": "stroke", stroke: panel, "stroke-width": 3
-    }, "β " + fmt(S.beta, 1) + "°"));
+    }, "δ " + fmt(S.beta, 1) + "°"));
 
-    // one head line per scenario, labelled at the toe
+    // one water-table line per scenario, labelled at the toe
     const heads = SCEN.map(sc => {
-      const h = Math.min(S[sc.key + "Mean"], S.z);
+      const d = S[sc.key + "Dwt"];
+      const h = Math.min(Math.max(S.z - d, 0), S.z);
       const [px, py] = P(0, h * cosB * scale);
       const [qx, qy] = P(L, h * cosB * scale);
-      return { sc, h, px, py, qx, qy };
+      return { sc, h, d, px, py, qx, qy };
     }).sort((a, b) => a.qy - b.qy);
 
     let lastY = -Infinity;
@@ -1288,12 +1403,12 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
       lastY = ly;
       g.appendChild(el("text", { x: o.qx + 9, y: ly, fill: c,
         "font-family": "var(--mono)", "font-size": 10.5,
-        "paint-order": "stroke", stroke: panel, "stroke-width": 3 }, fmt(o.h, 1) + " m"));
+        "paint-order": "stroke", stroke: panel, "stroke-width": 3 }, "d = " + fmt(o.d, 1) + " m"));
     });
 
     svg.appendChild(el("text", { x: 10, y: H - 9, fill: ink3,
       "font-family": "var(--mono)", "font-size": 10.5 },
-      "coloured lines: mean leachate head per scenario · shading: saturated waste"));
+      "coloured lines: pre-storm water table d per scenario · shading: saturated waste"));
 
     host.replaceChildren(svg);
   }
@@ -1432,6 +1547,117 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
       '<span><i class="dash"></i>Failure threshold, FS = 1</span>';
   }
 
+  /* ============================ pressure head ============================ */
+
+  function drawPsi() {
+    const host = document.getElementById("psiPlot");
+    const tip = document.getElementById("psiTip");
+    const W = Math.max(360, host.clientWidth || 640), H = 280;
+    const m = { t: 18, r: 18, b: 44, l: 58 };
+    const iw = W - m.l - m.r, ih = H - m.t - m.b;
+
+    const ink2 = cssVar("--ink-2"), ink3 = cssVar("--ink-3");
+    const line = cssVar("--line"), line2 = cssVar("--line-2"), panel = cssVar("--panel");
+
+    const tMax = R.runs[0].series[R.runs[0].series.length - 1].day;
+    const all = R.runs.flatMap(r => r.series.map(p => p.psi));
+    const crit = R.psiCritMedian;
+    let lo = Math.min(0, ...all), hi = Math.max(...all, isFinite(crit) ? crit : 0) * 1.12;
+    if (!(hi > lo)) hi = lo + 1;
+
+    const x = v => m.l + (v / tMax) * iw;
+    const y = v => m.t + ih - ((v - lo) / (hi - lo)) * ih;
+
+    const svg = el("svg", { viewBox: "0 0 " + W + " " + H, role: "img",
+      "aria-label": "Pressure head at the slip surface through the storm, one line per scenario" });
+
+    niceTicks(lo, hi, 5).forEach(t => {
+      svg.appendChild(el("line", { x1: m.l, y1: y(t), x2: m.l + iw, y2: y(t),
+        stroke: Math.abs(t) < 1e-9 ? line2 : line, "stroke-width": 1 }));
+      svg.appendChild(el("text", { x: m.l - 10, y: y(t) + 4, fill: ink3, "text-anchor": "end",
+        "font-family": "var(--mono)", "font-size": 10.5 }, fmt(t, 1)));
+    });
+    niceTicks(0, tMax, 6).forEach(t => {
+      if (t > tMax) return;
+      svg.appendChild(el("text", { x: x(t), y: m.t + ih + 18, fill: ink3, "text-anchor": "middle",
+        "font-family": "var(--mono)", "font-size": 10.5 }, fmt(t, 0)));
+    });
+    svg.appendChild(el("text", { x: m.l + iw / 2, y: H - 8, fill: ink2, "text-anchor": "middle",
+      "font-family": "var(--display)", "font-size": 11, "letter-spacing": ".12em" }, "DAYS SINCE THE RAIN STARTED"));
+    svg.appendChild(el("text", { x: 13, y: m.t + ih / 2, fill: ink2, "text-anchor": "middle",
+      "font-family": "var(--display)", "font-size": 11, "letter-spacing": ".12em",
+      transform: "rotate(-90 13 " + (m.t + ih / 2) + ")" }, "ψ AT Z (m)"));
+
+    // the rain stops here
+    const tEnd = R.days;
+    if (tEnd <= tMax) {
+      svg.appendChild(el("line", { x1: x(tEnd), y1: m.t, x2: x(tEnd), y2: m.t + ih,
+        stroke: ink3, "stroke-width": 1, "stroke-dasharray": "2 4", opacity: .8 }));
+      svg.appendChild(el("text", { x: x(tEnd) - 6, y: m.t + 12, fill: ink3, "text-anchor": "end",
+        "font-family": "var(--mono)", "font-size": 10,
+        "paint-order": "stroke", stroke: panel, "stroke-width": 3.5 }, "rain stops"));
+    }
+
+    // the head at which the median slope is exactly at FS = 1
+    if (isFinite(crit) && crit > lo && crit < hi) {
+      svg.appendChild(el("line", { x1: m.l, y1: y(crit), x2: m.l + iw, y2: y(crit),
+        stroke: ink2, "stroke-width": 1.25, "stroke-dasharray": "5 4" }));
+      svg.appendChild(el("text", { x: m.l + 6, y: y(crit) - 6, fill: ink2,
+        "font-family": "var(--mono)", "font-size": 10,
+        "paint-order": "stroke", stroke: panel, "stroke-width": 3.5 },
+        "median sample reaches FS = 1 at ψ = " + fmt(crit, 2) + " m"));
+    }
+
+    R.runs.forEach(r => {
+      const d = r.series.map((p, i) => (i ? "L " : "M ") + x(p.day) + " " + y(p.psi)).join(" ");
+      svg.appendChild(el("path", { d, fill: "none", stroke: cssVar(r.tone), "stroke-width": 2,
+        "stroke-linejoin": "round", "stroke-linecap": "round" }));
+    });
+
+    const cursor = el("line", { x1: 0, y1: m.t, x2: 0, y2: m.t + ih, stroke: ink3, "stroke-width": 1, opacity: 0 });
+    svg.appendChild(cursor);
+    const dots = R.runs.map(r => {
+      const c = el("circle", { r: 4, fill: cssVar(r.tone), stroke: panel, "stroke-width": 2, opacity: 0 });
+      svg.appendChild(c);
+      return c;
+    });
+    const hit = el("rect", { x: m.l, y: m.t, width: iw, height: ih, fill: "transparent", style: "cursor:crosshair" });
+    svg.appendChild(hit);
+
+    hit.addEventListener("pointermove", ev => {
+      const box = svg.getBoundingClientRect();
+      const sx = (ev.clientX - box.left) * (W / box.width);
+      const dv = Math.min(Math.max(((sx - m.l) / iw) * tMax, 0), tMax);
+      const n = R.runs[0].series.length;
+      const idx = Math.min(n - 1, Math.max(0, Math.round(dv / tMax * (n - 1))));
+      const cx = x(R.runs[0].series[idx].day);
+      cursor.setAttribute("x1", cx); cursor.setAttribute("x2", cx); cursor.setAttribute("opacity", .7);
+      R.runs.forEach((r, i) => {
+        dots[i].setAttribute("cx", cx);
+        dots[i].setAttribute("cy", y(r.series[idx].psi));
+        dots[i].setAttribute("opacity", 1);
+      });
+      tip.innerHTML = '<span class="th">Day ' + fmt(R.runs[0].series[idx].day, 1) + "</span>" +
+        R.runs.map(r => '<div class="row"><i style="background:' + cssVar(r.tone) + '"></i>' + r.name +
+          "<u>" + fmt(r.series[idx].psi, 2) + " m</u></div>").join("");
+      const hostBox = host.getBoundingClientRect();
+      placeTip(tip, host, box.left - hostBox.left + cx / W * box.width, ev.clientY - hostBox.top);
+    });
+    hit.addEventListener("pointerleave", () => {
+      tip.style.opacity = 0; cursor.setAttribute("opacity", 0);
+      dots.forEach(d => d.setAttribute("opacity", 0));
+    });
+
+    host.replaceChildren(tip, svg);
+
+    document.getElementById("psiKeys").innerHTML =
+      R.runs.map(r => '<span><i style="background:' + cssVar(r.tone) + '"></i>' + r.name +
+        " <b>" + fmt(r.psi, 2) + " m</b> at day " + int(R.days) +
+        " (" + (r.rise >= 0 ? "+" : "") + fmt(r.rise, 2) + " from the storm)</span>").join("") +
+      "<span>ψ is capped at Z·cos²δ = <b>" + fmt(R.psiCap, 2) + " m</b>, the water table at the surface</span>" +
+      (R.runs.some(r => r.runoff) ? "<span>rainfall exceeds K_S in at least one scenario — the excess runs off</span>" : "");
+  }
+
   /* ============================ sweep ============================ */
 
   function drawSweep() {
@@ -1442,15 +1668,15 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
     const iw = W - m.l - m.r, ih = H - m.t - m.b;
 
     const ink2 = cssVar("--ink-2"), ink3 = cssVar("--ink-3");
-    const line = cssVar("--line"), line2 = cssVar("--line-2"), panel = cssVar("--panel"), accent = cssVar("--accent");
+    const line = cssVar("--line"), line2 = cssVar("--line-2"), panel = cssVar("--panel");
 
-    const yMaxRaw = Math.max(0.02, ...R.sweep.map(p => p.pf), ...R.runs.map(r => r.pf));
+    const yMaxRaw = Math.max(0.02, ...R.sweep.flatMap(s => s.pts.map(p => p.pf)));
     const yMax = Math.min(1, yMaxRaw * 1.15);
-    const x = v => m.l + (v / S.z) * iw;
+    const x = v => m.l + (v / R.rainMax) * iw;
     const y = v => m.t + ih - (v / yMax) * ih;
 
     const svg = el("svg", { viewBox: "0 0 " + W + " " + H, role: "img",
-      "aria-label": "Failure probability versus mean leachate head, with each scenario marked" });
+      "aria-label": "Failure probability versus storm rainfall intensity, one line per scenario water table" });
 
     niceTicks(0, yMax, 4).forEach(t => {
       svg.appendChild(el("line", { x1: m.l, y1: y(t), x2: m.l + iw, y2: y(t),
@@ -1458,59 +1684,73 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
       svg.appendChild(el("text", { x: m.l - 10, y: y(t) + 4, fill: ink3, "text-anchor": "end",
         "font-family": "var(--mono)", "font-size": 10.5 }, fmt(t * 100, t > 0 && t < 0.05 ? 1 : 0) + "%"));
     });
-    niceTicks(0, S.z, 6).forEach(t => {
-      if (t > S.z) return;
+    niceTicks(0, R.rainMax, 6).forEach(t => {
+      if (t > R.rainMax) return;
       svg.appendChild(el("text", { x: x(t), y: m.t + ih + 18, fill: ink3, "text-anchor": "middle",
-        "font-family": "var(--mono)", "font-size": 10.5 }, fmt(t, t % 1 === 0 ? 0 : 1)));
+        "font-family": "var(--mono)", "font-size": 10.5 }, fmt(t, 0)));
     });
     svg.appendChild(el("text", { x: m.l + iw / 2, y: H - 8, fill: ink2, "text-anchor": "middle",
-      "font-family": "var(--display)", "font-size": 11, "letter-spacing": ".12em" }, "MEAN LEACHATE HEAD (m)"));
+      "font-family": "var(--display)", "font-size": 11, "letter-spacing": ".12em" },
+      "RAINFALL OVER THE WINDOW (mm/day)"));
     svg.appendChild(el("text", { x: 14, y: m.t + ih / 2, fill: ink2, "text-anchor": "middle",
       "font-family": "var(--display)", "font-size": 11, "letter-spacing": ".12em",
       transform: "rotate(-90 14 " + (m.t + ih / 2) + ")" }, "P(FAILURE)"));
 
-    const dLine = R.sweep.map((p, i) => (i ? "L " : "M ") + x(p.h) + " " + y(p.pf)).join(" ");
-    svg.appendChild(el("path", { d: dLine + " L " + x(R.sweep[R.sweep.length - 1].h) + " " + y(0) + " L " + x(R.sweep[0].h) + " " + y(0) + " Z",
-      fill: accent, opacity: .07 }));
-    svg.appendChild(el("path", { d: dLine, fill: "none", stroke: accent, "stroke-width": 2,
-      "stroke-linejoin": "round", "stroke-linecap": "round" }));
+    R.sweep.forEach(s => {
+      const d = s.pts.map((p, i) => (i ? "L " : "M ") + x(p.mmd) + " " + y(p.pf)).join(" ");
+      svg.appendChild(el("path", { d, fill: "none", stroke: cssVar(s.tone), "stroke-width": 2,
+        "stroke-linejoin": "round", "stroke-linecap": "round" }));
+    });
 
     R.runs.forEach(r => {
-      const hx = Math.min(r.headMeanInput, S.z);
-      svg.appendChild(el("circle", { cx: x(hx), cy: y(r.pf), r: 5.5, fill: cssVar(r.tone), stroke: panel, "stroke-width": 2 }));
+      const px = x(Math.min(r.mmd, R.rainMax));
+      svg.appendChild(el("circle", { cx: px, cy: y(r.pf), r: 5.5, fill: cssVar(r.tone), stroke: panel, "stroke-width": 2 }));
       svg.appendChild(el("text", {
-        x: x(hx), y: y(r.pf) - 12, fill: cssVar(r.tone), "text-anchor": "middle",
+        x: px, y: y(r.pf) - 12, fill: cssVar(r.tone), "text-anchor": "middle",
         "font-family": "var(--mono)", "font-size": 10.5, "paint-order": "stroke", stroke: panel, "stroke-width": 4
       }, pct(r.pf) + "%"));
     });
 
     const cursor = el("line", { x1: 0, y1: m.t, x2: 0, y2: m.t + ih, stroke: ink3, "stroke-width": 1, opacity: 0 });
-    const dot = el("circle", { r: 4, fill: accent, stroke: panel, "stroke-width": 2, opacity: 0 });
-    svg.appendChild(cursor); svg.appendChild(dot);
+    svg.appendChild(cursor);
+    const dots = R.sweep.map(s => {
+      const c = el("circle", { r: 4, fill: cssVar(s.tone), stroke: panel, "stroke-width": 2, opacity: 0 });
+      svg.appendChild(c);
+      return c;
+    });
     const hit = el("rect", { x: m.l, y: m.t, width: iw, height: ih, fill: "transparent", style: "cursor:crosshair" });
     svg.appendChild(hit);
 
     hit.addEventListener("pointermove", ev => {
       const box = svg.getBoundingClientRect();
       const sx = (ev.clientX - box.left) * (W / box.width);
-      const hv = ((sx - m.l) / iw) * S.z;
-      let best = R.sweep[0];
-      for (const p of R.sweep) if (Math.abs(p.h - hv) < Math.abs(best.h - hv)) best = p;
-      const cx = x(best.h), cy = y(best.pf);
+      const n = R.sweep[0].pts.length;
+      const v = Math.min(Math.max(((sx - m.l) / iw) * R.rainMax, 0), R.rainMax);
+      const idx = Math.min(n - 1, Math.max(0, Math.round(v / R.rainMax * (n - 1))));
+      const cx = x(R.sweep[0].pts[idx].mmd);
       cursor.setAttribute("x1", cx); cursor.setAttribute("x2", cx); cursor.setAttribute("opacity", .7);
-      dot.setAttribute("cx", cx); dot.setAttribute("cy", cy); dot.setAttribute("opacity", 1);
-      tip.innerHTML = '<span class="th">Mean head ' + fmt(best.h, 2) + " m</span>" +
-        '<div class="row">P(failure)<u>' + pct(best.pf) + "%</u></div>";
+      R.sweep.forEach((s, i) => {
+        dots[i].setAttribute("cx", cx);
+        dots[i].setAttribute("cy", y(s.pts[idx].pf));
+        dots[i].setAttribute("opacity", 1);
+      });
+      tip.innerHTML = '<span class="th">' + fmt(R.sweep[0].pts[idx].mmd, 1) + " mm/day for " + int(R.days) + " days</span>" +
+        R.sweep.map((s, i) => '<div class="row"><i style="background:' + cssVar(s.tone) + '"></i>d = ' + fmt(s.dwt, 1) + " m" +
+          "<u>" + pct(s.pts[idx].pf) + "%</u></div>").join("");
       const hostBox = host.getBoundingClientRect();
-      placeTip(tip, host,
-        box.left - hostBox.left + cx / W * box.width,
-        box.top - hostBox.top + cy / H * box.height - 4);
+      placeTip(tip, host, box.left - hostBox.left + cx / W * box.width, ev.clientY - hostBox.top);
     });
     hit.addEventListener("pointerleave", () => {
-      tip.style.opacity = 0; cursor.setAttribute("opacity", 0); dot.setAttribute("opacity", 0);
+      tip.style.opacity = 0; cursor.setAttribute("opacity", 0);
+      dots.forEach(d => d.setAttribute("opacity", 0));
     });
 
     host.replaceChildren(tip, svg);
+
+    document.getElementById("sweepKeys").innerHTML =
+      R.sweep.map(s => '<span><i style="background:' + cssVar(s.tone) + '"></i>d = ' + fmt(s.dwt, 1) + " m — " +
+        s.names.join(", ") + "</span>").join("") +
+      "<span>markers sit at each scenario's own rainfall</span>";
   }
 
   /* ============================ site rainfall ============================ */
@@ -1583,13 +1823,14 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
       const box = svg.getBoundingClientRect();
       const sx = (ev.clientX - box.left) * (W / box.width);
       const mm = Math.max(0, ((sx - m.l) / iw) * hiRain);
-      const head = Math.min((S.infil * mm / 1000) / S.nDrain, S.z);
+      // that total spread evenly over the window, through the same TRIGRS kernel
+      const psi = R.capPsi(rn.basePsi + Math.min(mm / rn.days / 86400000, R.K) * R.kernSum);
       let below = 0;
       for (let i = 0; i < rn.accum.length; i++) if (rn.accum[i] <= mm) below++;
       tip.innerHTML = '<span class="th">' + fmt(mm, 0) + " mm in " + int(rn.days) + " days</span>" +
         '<div class="row">Non-exceedance<u>' + fmt(below / rn.accum.length * 100, 1) + "%</u></div>" +
-        '<div class="row">Implied head<u>' + fmt(head, 2) + " m</u></div>" +
-        '<div class="row">P(failure) there<u>' + pct(pfAtHead(head)) + "%</u></div>";
+        '<div class="row">ψ if spread evenly<u>' + fmt(psi, 2) + " m</u></div>" +
+        '<div class="row">P(failure) there<u>' + pct(R.pfAt(psi)) + "%</u></div>";
       const hostBox = host.getBoundingClientRect();
       placeTip(tip, host, box.left - hostBox.left + sx / W * box.width,
         box.top - hostBox.top + m.t / H * box.height + 30);
@@ -1602,8 +1843,8 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
     document.getElementById("rainKeys").innerHTML =
       "<span>window total: median <b>" + fmt(rn.median, 0) + "</b> mm · 90th <b>" +
         fmt(rn.p90, 0) + "</b> · 99th <b>" + fmt(rn.p99, 0) + "</b></span>" +
-      "<span>mean head <b>" + fmt(rn.headMean, 2) + " m</b></span>" +
-      "<span>P(failure) on rainfall alone <b>" + pct(rn.pf) + "%</b></span>" +
+      "<span>ψ rise from that rain: median <b>" + fmt(rn.riseMedian, 2) + " m</b> · 99th <b>" + fmt(rn.rise99, 2) + " m</b></span>" +
+      "<span>on the baseline water table (ψ = " + fmt(rn.basePsi, 2) + " m dry) that is P(failure) <b>" + pct(rn.pf) + "%</b> against <b>" + pct(R.dryPf) + "%</b> with no storm</span>" +
       "<span>days drawn independently, so wet spells are not reproduced — the spread here is a floor</span>" +
       (over ? "<span>" + int(over) + " samples above " + fmt(hiRain, 0) + " mm are off the right edge</span>" : "");
 
@@ -1653,22 +1894,22 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
     return { mm: seen >= n * 0.5 ? mm : null, seen, want: n };
   }
 
-  // depth of rain that infiltrates, spread through the drainable voids it fills
-  function impliedRise(c) {
-    const { mm } = caseRain(c, S.winDays);
-    return mm == null ? null : (S.infil * mm / 1000) / S.nDrain;
-  }
-
-  function pfAtHead(h) {
-    const sw = R.sweep;
-    if (h <= sw[0].h) return sw[0].pf;
-    for (let i = 1; i < sw.length; i++) {
-      if (sw[i].h >= h) {
-        const a = sw[i - 1], b = sw[i];
-        return a.pf + (b.pf - a.pf) * (h - a.h) / (b.h - a.h);
-      }
+  // the measured daily record put through TRIGRS: each day's rain is a rainfall
+  // period, superposed at the moment of failure, on the baseline water table
+  function casePsi(c) {
+    const days = R.days;
+    if (!c.daily || !c.daily.length) return null;
+    const n = Math.min(days, c.daily.length);
+    let seen = 0, rise = 0;
+    for (let i = 0; i < n; i++) {
+      const v = c.daily[c.daily.length - 1 - i];     // i = 0 is the day of the failure
+      if (v == null) continue;
+      seen++;
+      rise += Math.min(v / 86400000, R.K) * R.kern[days - 1 - i];
     }
-    return sw[sw.length - 1].pf;
+    if (seen < n * 0.5) return null;
+    const base = R.steady(S.baselineDwt);
+    return { rise, psi: R.capPsi(base + rise), base };
   }
 
   function drawCases() {
@@ -1850,15 +2091,15 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
   }
 
   function drawCaseTable() {
-    const dry = pfAtHead(0);
+    const dry = R.dryPf;
     document.getElementById("caseBody").innerHTML = CASES.slice()
       .sort((a, b) => a.date.localeCompare(b.date))
       .map(c => {
         const tone = "var(" + BLAME[c.implicated].tone + ")";
         const w = caseRain(c, S.winDays);
-        const rise = impliedRise(c);
-        const head = rise == null ? null : Math.min(rise, S.z);
-        const pf = head == null ? null : pfAtHead(head);
+        const cp = casePsi(c);
+        const rise = cp == null ? null : cp.rise;
+        const pf = cp == null ? null : R.pfAt(cp.psi);
         const on = c.id === picked;
         return '<tr data-id="' + c.id + '" style="cursor:pointer' + (on ? ";background:var(--accent-soft)" : "") + '">' +
           '<th scope="row"><span style="background:' + tone + '"></span>' + c.short + "</th>" +
@@ -1866,7 +2107,8 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
           "<td>" + (w.mm == null ? "—" : fmt(w.mm, 0) + " mm") + "</td>" +
           "<td>" + (c.p30pct != null ? ord(c.p30pct)
                   : c.p7pct != null ? ord(c.p7pct) + "*" : "—") + "</td>" +
-          "<td>" + (rise == null ? "—" : fmt(rise, 2) + " m") + "</td>" +
+          "<td>" + (rise == null ? "—" : "+" + fmt(rise, 2) + " m") + "</td>" +
+          "<td>" + (cp == null ? "—" : fmt(cp.psi, 2) + " m") + "</td>" +
           "<td>" + (pf == null ? "—" : pct(pf) + " %") + "</td>" +
           "<td>" + (pf == null ? "—" : "+" + fmt((pf - dry) * 100, 1) + " pts") + "</td>" +
           "<td>" + BLAME[c.implicated].tag + "</td>" +
@@ -1880,9 +2122,9 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
     });
 
     document.getElementById("caseNote").innerHTML =
-      "<span>ΔH = infiltration ratio × rainfall ÷ drainable porosity — currently " +
-        fmt(S.infil, 2) + " × depth ÷ " + fmt(S.nDrain, 2) + " over " + int(S.winDays) + " days, capped at z = " + fmt(S.z, 1) + " m</span>" +
-      "<span>Lift is measured against a dry liner, which this slope fails at " + pct(dry) + "% of the time on its own</span>" +
+      "<span>Each measured day is one TRIGRS rainfall period, superposed at the failure date over the last " +
+        int(R.days) + " days, on the baseline water table (d = " + fmt(S.baselineDwt, 1) + " m, ψ = " + fmt(R.steady(S.baselineDwt), 2) + " m before the rain)</span>" +
+      "<span>Lift is measured against that same slope with no storm at all, which fails " + pct(dry) + "% of the time on its own</span>" +
       "<span>Percentile is the 30-day rank, or the 7-day rank where marked *; — means no gauge or too short a record</span>";
   }
 
@@ -1904,7 +2146,7 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
           "<dt>Mean FS</dt><dd>" + fmt(r.mean, 3) + "</dd>" +
           "<dt>Reliability β</dt><dd>" + fmt(r.sd > 0 ? (r.mean - 1) / r.sd : 0, 2) + "</dd>" +
           "<dt>Failed samples</dt><dd>" + int(r.fails) + " / " + int(S.N) + "</dd>" +
-          "<dt>Mean head</dt><dd>" + fmt(r.headMeanActual, 2) + " m</dd>" +
+          "<dt>ψ at Z</dt><dd>" + fmt(r.psi, 2) + " m</dd>" +
         "</dl>";
       return card;
     }));
@@ -1914,7 +2156,8 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
     document.getElementById("summaryBody").innerHTML = R.runs.map(r =>
       "<tr>" +
         '<th scope="row"><span style="background:var(' + r.tone + ')"></span>' + r.name + "</th>" +
-        "<td>" + fmt(r.headMeanActual, 2) + " m</td>" +
+        "<td>" + fmt(r.mmd, 0) + " mm/day</td>" +
+        "<td>" + fmt(r.psi, 2) + " m</td>" +
         "<td>" + fmt(r.mean, 3) + "</td>" +
         "<td>" + fmt(r.median, 3) + "</td>" +
         "<td>" + fmt(r.sd, 3) + "</td>" +
@@ -1927,8 +2170,8 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
 
   function drawRunstate() {
     document.getElementById("runstate").innerHTML =
-      "<b>" + int(S.N) + "</b> samples × 3 scenarios<br>seed <b>" + S.seed + "</b> · β = <b>" + fmt(S.beta, 1) +
-      "°</b> · z = <b>" + fmt(S.z, 1) + " m</b>";
+      "<b>" + int(S.N) + "</b> samples × 3 scenarios<br>seed <b>" + S.seed + "</b> · δ = <b>" + fmt(S.beta, 1) +
+      "°</b> · Z = <b>" + fmt(S.z, 1) + " m</b> · " + int(R ? R.days : S.winDays) + "-day storm";
   }
 
   /* ============================ render loop ============================ */
@@ -1944,6 +2187,7 @@ FS = τ_r / τ_d      ·      failure when FS ≤ 1</div>
     drawRunstate();
     drawSection();
     drawCards();
+    drawPsi();
     drawHist();
     drawSweep();
     drawRain();

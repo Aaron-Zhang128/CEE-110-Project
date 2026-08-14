@@ -1,15 +1,20 @@
-# Landfill slope stability — Monte Carlo
+# Landfill slope stability — TRIGRS + Monte Carlo
 
-A probabilistic slope-stability simulator for a lined landfill. It draws thousands of
-synthetic slopes, evaluates the infinite-slope factor of safety for each one, and
-reports how often the slope fails under three leachate scenarios — baseline, heavy
-rainfall, and a mitigation case.
+A probabilistic slope-stability simulator for a lined landfill. Rainfall is pushed into
+the waste with **TRIGRS v2.0** — the USGS transient infiltration model — and the pressure
+head that reaches the slip surface is carried into the infinite-slope factor of safety.
+It draws thousands of synthetic slopes, evaluates FS for each one, and reports how often
+the slope fails under three scenarios: baseline, heavy rainfall, and a mitigation case
+where the same storm falls on a slope that is drained deeper.
 
 It also carries twelve real waste-slope failures with the rain that actually fell
 before each one, measured at the nearest NOAA gauge, so the model's leachate-head
 axis can be read against something that happened.
 
 ![The control rail, the slope cross-section, and probability of failure for each scenario](docs/overview.jpg)
+
+> The model was a prescribed leachate head until the TRIGRS swap; the factor of safety is
+> unchanged, but ψ is now produced by the rain rather than assumed.
 
 ## Running it
 
@@ -24,49 +29,72 @@ open index.html          # macOS; use `start` on Windows, `xdg-open` on Linux
 
 ## The model
 
-Each sample is one realisation of an infinite slope with a leachate head above the liner:
+TRIGRS — *Transient Rainfall Infiltration and Grid-Based Regional Slope-Stability
+Analysis*, version 2.0 (Baum, Savage & Godt, USGS Open-File Report 2008-1159) — in its
+saturated form. Each day of rain enters as its own rainfall period, and the periods are
+superposed through Iverson's (2000) linearised solution:
 
 ```
-σ   = γ·z·cos²β            total normal stress on the slip plane
-u   = γ_w·H·cos²β          pore pressure from the leachate head
-σ′  = max(σ − u, 0)        effective normal stress
-τ_r = c′ + σ′·tan φ′       shear resistance
-τ_d = γ·z·sin β·cos β      driving shear stress
-FS  = τ_r / τ_d            the slope has failed when FS ≤ 1
+D_1     = D_0 / cos²δ                          diffusivity in the vertical
+β       = cos²δ − I_ZLT/K_S                    steady-state gradient
+Rf(τ)   = 2√(D_1·τ/π)·exp(−Z²/4D_1τ) − Z·erfc[ Z / 2√(D_1·τ) ]
+ψ(Z,t)  = (Z − d)·β + Σ (I_n/K_S)·[ Rf(t−t_n) − Rf(t−t_n₊₁) ]
+FS(Z,t) = tan φ′/tan δ + [ c′ − ψ·γ_w·tan φ′ ] / [ γ_s·Z·sin δ·cos δ ]
 ```
 
-The probability of failure is the share of samples with FS ≤ 1.
+`Z` and `d` are vertical depths. Surface flux is capped at `K_S` and the excess runs off;
+ψ is capped at `Z·cos²δ`, the water table standing at the ground surface. Above the water
+table ψ goes negative — the saturated model reports that suction rather than solving the
+unsaturated zone, which is TRIGRS's own caveat for this option. The slope has failed when
+FS ≤ 1, and the probability of failure is the share of samples that get there.
 
-| Variable | Distribution | Default | Notes |
+The split between random and deterministic follows TRIGRS: hydraulic properties are grid
+values, not random variables, so ψ is one number per scenario and the Monte Carlo runs
+over strength alone.
+
+| Variable | Kind | Default | Notes |
 | --- | --- | --- | --- |
 | Cohesion `c′` | lognormal | mean 10 kPa, sd 7.2 | stays positive, skews right |
 | Friction angle `φ′` | normal | mean 32°, sd 10.9 | clipped to 1–50° |
-| Unit weight `γ` | normal | mean 10.5 kN/m³, sd 2.5 | floored at 1 kN/m³ |
-| Leachate head `H` | lognormal | 3.0 / 4.5 / 2.5 m | capped at the slab depth `z` |
-| Slope angle `β` | fixed | 25° | |
-| Depth to slip plane `z` | fixed | 10 m | vertical depth |
-| Leachate unit weight `γ_w` | fixed | 9.81 kN/m³ | |
+| Unit weight `γ_s` | normal | mean 10.5 kN/m³, sd 2.5 | floored at 1 kN/m³ |
+| Conductivity `K_S` | fixed | 1×10⁻⁵ m/s | also the infiltration capacity |
+| Diffusivity `D_0` | fixed | 5×10⁻⁴ m²/s | `D_0/K_S` sets how fast the front arrives |
+| Long-term flux `I_ZLT` | fixed | 1 mm/day | clamped below `K_S` |
+| Water table `d` | fixed | 6.5 / 6.5 / 8.5 m deep | the mitigation lever |
+| Rainfall `I_Z` | fixed | 5 / 30 / 30 mm/day | over the window |
+| Slope angle `δ` | fixed | 25° | |
+| Slip depth `Z` | fixed | 10 m | vertical depth |
+| Water unit weight `γ_w` | fixed | 9.81 kN/m³ | |
+| Window | fixed | 30 days | storm length and antecedent window |
 | Daily rainfall | lognormal | mean 2.24 mm/day, sd 7.12 | site sample; drives the rainfall case |
 
 Material properties are drawn **once** and shared by all three scenarios, so the only
-thing separating them is how much leachate sits above the liner — the comparison is a
-controlled one, run on the same thousands of slopes wetter or drier.
+thing separating them is the rain and the drainage — the comparison is a controlled one,
+run on the same thousands of slopes wetter or better drained.
+
+Because FS falls monotonically with ψ, every sample has a single pressure head at which it
+reaches FS = 1. Those are computed and sorted once, so P(failure) at any head is a binary
+search: the sensitivity curves are exact rather than resampled.
 
 The random stream is seeded (default 42), so a given seed and sample count reproduce
 exactly.
 
 ## What it shows
 
-![Overlaid factor-of-safety distributions with the FS = 1 failure threshold](docs/distribution.jpg)
+![Pressure head through the storm above the overlaid factor-of-safety distributions](docs/distribution.jpg)
 
-- **Cross-section** — drawn to the current geometry, with each scenario's mean head.
-- **Scenario cards** — probability of failure, mean FS, failed-sample count, and the
-  reliability index β = (mean FS − 1) / σ_FS, the margin to failure in standard deviations.
+- **Cross-section** — drawn to the current geometry, with each scenario's pre-storm water
+  table.
+- **Scenario cards** — probability of failure, mean FS, failed-sample count, the pressure
+  head at the slip surface, and the reliability index β = (mean FS − 1) / σ_FS, the margin
+  to failure in standard deviations.
+- **Pressure head through the storm** — ψ at the slip surface against time, one line per
+  scenario, with the head at which the median sample reaches FS = 1. The head keeps
+  climbing after the rain stops; that lag is what a prescribed head cannot show.
 - **Factor of safety** — the three distributions on shared bins, with the FS = 1 threshold.
-- **Sensitivity to leachate head** — failure probability as the mean head sweeps from a
-  dry liner to a fully saturated slab, with each scenario marked. The curve uses common
-  random numbers so it stays smooth; markers use each scenario's own spread, so they land
-  near the curve rather than exactly on it.
+- **Sensitivity to rainfall** — failure probability as the storm intensity sweeps upward,
+  one curve per water table, with each scenario marked. Curves flatten where ψ hits its
+  ceiling at the ground surface.
 - **Summary** — mean, median, standard deviation and 5th percentile FS per scenario.
 
 Every input on the left is adjustable, including sample count (1 000–100 000) and seed;
@@ -80,12 +108,15 @@ and standard deviation alone. The fit predicts a median of 0.672 against the obs
 0.69, 2.6% out, and it never saw the median. A gamma on the same two moments misses
 it by 55×; an exponential is rejected by the coefficient of variation (3.18, not 1).
 
-The page samples that distribution day by day across the antecedent window, converts
-the accumulated depth to a leachate head with the same infiltration and porosity
-coefficients used for the real failures, and reports the failure probability that
-rainfall alone produces. With the defaults, a 30-day window gives a median of about
-58 mm and a mean head of 0.20 m — this site's ordinary month barely moves the slope,
-and what risk there is lives in the tail.
+The page samples that distribution day by day across the window and pushes each day
+through the same TRIGRS response used everywhere else, then reports the failure
+probability on the baseline water table. With the defaults, a 30-day window gives a
+median of about 58 mm and a median ψ rise of 0.08 m against a pre-storm 2.87 m — this
+site's ordinary month barely moves the slope, and what risk there is lives in the tail.
+
+Because the solution is linear in the rainfall intensities, the response collapses to one
+weight per day of the window. Recent rain counts for more than old rain, and the weights
+say by how much.
 
 Two caveats are exposed as controls rather than buried: days are drawn independently,
 so real storm clustering is not reproduced and the spread of the window total is a
@@ -104,19 +135,17 @@ Three further sections carry real data rather than simulated slopes:
   was consulted.
 - **Rain before the slide** — the daily hyetograph for the six weeks up to whichever
   failure is selected. Click a row in either section to change it.
-- **Observed rainfall through the model** — each event's measured rainfall converted to
-  a head rise and pushed through this slope's own failure curve.
+- **Observed rainfall through the model** — each event's measured daily record fed into
+  TRIGRS one day at a time, superposed at the failure date, and pushed through this
+  slope's own failure curve.
 
-The conversion is deliberately crude and fully exposed on the control rail:
-
-```
-ΔH = infiltration ratio × rainfall ÷ drainable porosity
-```
-
-with the antecedent window adjustable from 3 to 45 days. Defaults are 0.30 and 0.10.
-The head is taken as rainfall alone on a dry liner, so the last column isolates what
-that rain contributes by itself. This is a water-balance sketch, not a measured leachate
-level — no gauge in the dataset measured the head inside the waste.
+Every day of the gauge record becomes a TRIGRS rainfall period, so the timing of the rain
+matters and not only its total: 100 mm in the last week is not the same head as 100 mm
+spread over the month. The window is adjustable from 3 to 45 days, and the rise is added
+to the baseline scenario's water table, so the last column isolates what that rain
+contributes on top of the standing head. This is still a model of the rain, not a
+measurement of the waste — no gauge in the dataset measured the pressure head inside the
+landfill, and the hydraulic properties are this page's defaults, not each site's.
 
 Every failure whose published account blames rain sits at or above the 57th percentile
 for 7-day antecedent rainfall. All four whose accounts blame something else — liner
