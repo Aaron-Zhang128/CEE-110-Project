@@ -8,13 +8,12 @@ the slope fails under three scenarios: baseline, heavy rainfall, and a mitigatio
 where the same storm falls on a slope that is drained deeper.
 
 It also carries twelve real waste-slope failures with the rain that actually fell
-before each one, measured at the nearest NOAA gauge, so the model's leachate-head
-axis can be read against something that happened.
+before each one, measured at the nearest NOAA gauge, so the modelled response can be
+read against something that happened.
+
+**Live: [cee-110-project.vercel.app](https://cee-110-project.vercel.app)**
 
 ![The control rail, the slope cross-section, and probability of failure for each scenario](docs/overview.jpg)
-
-> The model was a prescribed leachate head until the TRIGRS swap; the factor of safety is
-> unchanged, but ψ is now produced by the rain rather than assumed.
 
 ## Running it
 
@@ -26,6 +25,8 @@ git clone https://github.com/Aaron-Zhang128/CEE-110-Project.git
 cd CEE-110-Project
 open index.html          # macOS; use `start` on Windows, `xdg-open` on Linux
 ```
+
+`main` deploys to Vercel on push, so the live page is whatever is on `main`.
 
 ## The model
 
@@ -189,4 +190,21 @@ The "Acceptable / Marginal / High / Critical" labels on the scenario cards are a
 convention (≤ 1% / ≤ 5% / ≤ 15% / above), not a code requirement — adjust them to
 whatever tolerable-risk threshold applies.
 
+TRIGRS was built for shallow landslides, and at the default 10 m slip depth the transient
+response is heavily damped: a month of ordinary site rain adds under a tenth of a metre of
+head, while the standing water table supplies nearly three. That is a real property of the
+model at this depth, not a defect — but it means the mitigation lever on this page is
+drainage, and rainfall only moves the answer when it is extreme. Shorten `Z` or raise
+`D_0` and the storm starts to dominate.
+
 The page follows your system light or dark theme.
+
+## References
+
+- Baum, R.L., Savage, W.Z. & Godt, J.W. (2008). *TRIGRS — A Fortran Program for Transient
+  Rainfall Infiltration and Grid-Based Regional Slope-Stability Analysis, Version 2.0*.
+  U.S. Geological Survey Open-File Report 2008-1159.
+- Iverson, R.M. (2000). Landslide triggering by rain infiltration. *Water Resources
+  Research* 36(7), 1897–1910.
+- NOAA GHCN-Daily and Global Summary of the Day, for all gauge rainfall.
+- Per-failure sources are cited on each row of the case data in `data/landfill-failures.csv`.
